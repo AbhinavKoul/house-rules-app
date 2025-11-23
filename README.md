@@ -65,7 +65,12 @@ Submit a house rules acknowledgment with guest details and booking dates.
 ---
 
 #### 3. GET `/api/acknowledgments`
-Retrieve all acknowledgments (admin endpoint).
+Retrieve all acknowledgments (admin endpoint - requires authentication).
+
+**Headers Required**:
+```
+X-Host-Key: your-host-key
+```
 
 **Response** (200 OK):
 ```json
@@ -84,10 +89,17 @@ Retrieve all acknowledgments (admin endpoint).
     "check_in_date": "2025-12-01",
     "check_out_date": "2025-12-05",
     "cancelled": false,
-    "acknowledged_at": "2025-11-23T18:59:59.622Z"
+    "acknowledged_at": "2025-11-23T18:59:59.622Z",
+    "ip_address": "192.168.1.1"
   }
 ]
 ```
+
+**Error Responses**:
+- `403 Forbidden`: Invalid or missing host key
+
+**Environment Variable Required**:
+Set `HOST_KEY` in your environment variables for authentication.
 
 ---
 
@@ -379,9 +391,10 @@ Features:
 ### API Access (Alternative)
 
 #### View All Bookings
-Make a GET request to:
-```
-https://your-app-name.herokuapp.com/api/acknowledgments
+Make a GET request with authentication header:
+```bash
+curl -H "X-Host-Key: your-host-key" \
+  https://your-app-name.herokuapp.com/api/acknowledgments
 ```
 
 #### View Blocked Dates
@@ -406,10 +419,13 @@ curl -X POST https://your-app-name.herokuapp.com/api/cancel-booking \
 ## Security Considerations
 
 - The database stores government ID numbers. Ensure compliance with data protection regulations (GDPR, local laws)
-- Consider adding authentication for the admin endpoint
+- Admin endpoints require host key authentication via `X-Host-Key` header
+- Store your `HOST_KEY` securely as an environment variable
+- Use a strong, randomly generated host key in production
 - In production, implement rate limiting to prevent abuse
 - Consider encrypting sensitive data in the database
 - Implement proper access controls and logging
+- Never commit your `.env` file or expose your `HOST_KEY` publicly
 
 ## Form Validation
 

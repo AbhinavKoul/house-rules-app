@@ -242,9 +242,16 @@ app.post('/api/acknowledge', async (req, res) => {
 
 // Get all acknowledgments (admin endpoint)
 app.get('/api/acknowledgments', async (req, res) => {
+  // Require authentication
+  const hostKey = req.headers['x-host-key'];
+
+  if (!hostKey || hostKey !== process.env.HOST_KEY) {
+    return res.status(403).json({ error: 'Unauthorized: Invalid or missing host key' });
+  }
+
   try {
     const result = await pool.query(
-      'SELECT id, name, email, dob, govt_id_type, govt_id_number, number_of_guests, number_of_children, relationship_type, additional_guests, check_in_date, check_out_date, cancelled, acknowledged_at FROM acknowledgments ORDER BY check_in_date DESC'
+      'SELECT id, name, email, dob, govt_id_type, govt_id_number, number_of_guests, number_of_children, relationship_type, additional_guests, check_in_date, check_out_date, cancelled, acknowledged_at, ip_address FROM acknowledgments ORDER BY check_in_date DESC'
     );
     res.json(result.rows);
   } catch (err) {
@@ -270,9 +277,9 @@ app.get('/api/blocked-dates', async (req, res) => {
 app.post('/api/cancel-booking', async (req, res) => {
   const { bookingId, hostKey } = req.body;
 
-  // Simple host key validation (in production, use proper authentication)
-  if (hostKey !== process.env.HOST_KEY && hostKey !== 'host-override-key-2024') {
-    return res.status(403).json({ error: 'Unauthorized: Invalid host key' });
+  // Validate host key
+  if (!hostKey || hostKey !== process.env.HOST_KEY) {
+    return res.status(403).json({ error: 'Unauthorized: Invalid or missing host key' });
   }
 
   if (!bookingId) {

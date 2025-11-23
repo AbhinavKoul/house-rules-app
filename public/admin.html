@@ -363,7 +363,18 @@
             hideMessage();
 
             try {
-                const response = await fetch('/api/acknowledgments');
+                const response = await fetch('/api/acknowledgments', {
+                    headers: {
+                        'X-Host-Key': hostKey
+                    }
+                });
+
+                if (response.status === 403) {
+                    container.innerHTML = '<div class="loading">Authentication failed. Invalid host key.</div>';
+                    showMessage('Invalid host key', 'error');
+                    return;
+                }
+
                 const bookings = await response.json();
 
                 if (bookings.length === 0) {
