@@ -444,12 +444,12 @@
                     </select>
                 </div>
                 <div>
-                    <label class="filter-label">Check-In From</label>
-                    <input type="date" id="dateFromFilter" class="filter-input" onchange="filterBookings()">
+                    <label class="filter-label">Date Range Start</label>
+                    <input type="date" id="dateFromFilter" class="filter-input" onchange="filterBookings()" title="When both dates are set, shows bookings overlapping with this range">
                 </div>
                 <div>
-                    <label class="filter-label">Check-In To</label>
-                    <input type="date" id="dateToFilter" class="filter-input" onchange="filterBookings()">
+                    <label class="filter-label">Date Range End</label>
+                    <input type="date" id="dateToFilter" class="filter-input" onchange="filterBookings()" title="When both dates are set, shows bookings overlapping with this range">
                 </div>
             </div>
         </div>
@@ -738,12 +738,29 @@
                 // Date range filter
                 let matchesDateRange = true;
                 if (dateFrom || dateTo) {
-                    const rowDate = new Date(checkInDate);
-                    if (dateFrom && rowDate < new Date(dateFrom)) {
-                        matchesDateRange = false;
-                    }
-                    if (dateTo && rowDate > new Date(dateTo)) {
-                        matchesDateRange = false;
+                    const bookingId = parseInt(row.getAttribute('data-booking-id'));
+                    const booking = allBookings.find(b => b.id === bookingId);
+
+                    if (booking) {
+                        const bookingCheckIn = new Date(booking.check_in_date);
+                        const bookingCheckOut = new Date(booking.check_out_date);
+
+                        // When both dates are provided, check if booking overlaps with the date range
+                        if (dateFrom && dateTo) {
+                            const rangeStart = new Date(dateFrom);
+                            const rangeEnd = new Date(dateTo);
+
+                            // Booking overlaps if: check-in <= range end AND check-out >= range start
+                            matchesDateRange = bookingCheckIn <= rangeEnd && bookingCheckOut >= rangeStart;
+                        } else {
+                            // When only one date is provided, filter by check-in date
+                            if (dateFrom && bookingCheckIn < new Date(dateFrom)) {
+                                matchesDateRange = false;
+                            }
+                            if (dateTo && bookingCheckIn > new Date(dateTo)) {
+                                matchesDateRange = false;
+                            }
+                        }
                     }
                 }
 
