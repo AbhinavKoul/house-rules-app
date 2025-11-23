@@ -433,7 +433,7 @@
             <div class="filter-grid">
                 <div>
                     <label class="filter-label">Search by Name or Email</label>
-                    <input type="text" id="searchInput" class="filter-input" placeholder="Type to search..." oninput="filterBookings()">
+                    <input type="text" id="searchInput" class="filter-input" placeholder="Search primary or additional guests..." oninput="filterBookings()">
                 </div>
                 <div>
                     <label class="filter-label">Status</label>
@@ -556,7 +556,7 @@
                     const statusClass = booking.cancelled ? 'status-cancelled' : 'status-active';
 
                     html += `
-                        <tr>
+                        <tr data-booking-id="${booking.id}">
                             <td>${booking.id}</td>
                             <td>${booking.name}</td>
                             <td>${booking.email}</td>
@@ -711,8 +711,21 @@
                 const checkInDate = row.cells[3].textContent;
                 const status = row.cells[6].textContent.toLowerCase();
 
-                // Search filter
-                const matchesSearch = name.includes(searchInput) || email.includes(searchInput);
+                // Search filter - includes primary guest and additional guests
+                let matchesSearch = name.includes(searchInput) || email.includes(searchInput);
+
+                // If not found in primary guest, search additional guests
+                if (!matchesSearch && searchInput) {
+                    const bookingId = parseInt(row.getAttribute('data-booking-id'));
+                    const booking = allBookings.find(b => b.id === bookingId);
+
+                    if (booking && booking.additional_guests && Array.isArray(booking.additional_guests)) {
+                        // Check if any additional guest name matches
+                        matchesSearch = booking.additional_guests.some(guest =>
+                            guest.name && guest.name.toLowerCase().includes(searchInput)
+                        );
+                    }
+                }
 
                 // Status filter
                 let matchesStatus = true;
