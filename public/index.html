@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>House Rules - Acknowledgment</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>House Rules</h1>
+            <p>Please review the house rules document below and provide your acknowledgment</p>
+        </header>
+
+        <div class="content">
+            <!-- PDF Viewer Section -->
+            <div class="pdf-section">
+                <div class="pdf-container">
+                    <embed src="/House_Rules.pdf" type="application/pdf" width="100%" height="800px">
+                    <p class="pdf-fallback">
+                        If the PDF doesn't display, you can <a href="/House_Rules.pdf" target="_blank">download it here</a>.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Acknowledgment Form Section -->
+            <div class="form-section">
+                <h2>Acknowledgment Form</h2>
+                <p class="form-intro">By submitting this form, you confirm that you have read and agree to abide by the house rules outlined above.</p>
+
+                <form id="acknowledgmentForm">
+                    <div class="form-group">
+                        <label for="name">Full Name *</label>
+                        <input type="text" id="name" name="name" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="email">Email Address *</label>
+                        <input type="email" id="email" name="email" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="dob">Date of Birth *</label>
+                        <input type="date" id="dob" name="dob" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="govtIdType">Government ID Type *</label>
+                        <select id="govtIdType" name="govtIdType" required>
+                            <option value="">Select ID Type</option>
+                            <option value="Aadhar">Aadhar Card</option>
+                            <option value="Driving License">Driving License</option>
+                            <option value="Passport">Passport</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="govtIdNumber">Government ID Number *</label>
+                        <input type="text" id="govtIdNumber" name="govtIdNumber" required>
+                    </div>
+
+                    <div class="form-group checkbox-group">
+                        <label>
+                            <input type="checkbox" id="confirmRead" required>
+                            I confirm that I have read and understood the house rules document
+                        </label>
+                    </div>
+
+                    <div class="form-group checkbox-group">
+                        <label>
+                            <input type="checkbox" id="confirmAgree" required>
+                            I agree to abide by all the rules and regulations mentioned
+                        </label>
+                    </div>
+
+                    <div class="button-group">
+                        <button type="submit" class="btn btn-primary">Submit Acknowledgment</button>
+                    </div>
+                </form>
+
+                <div id="message" class="message"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
