@@ -386,4 +386,27 @@ document.addEventListener('DOMContentLoaded', function() {
     const maxDate = new Date();
     maxDate.setFullYear(maxDate.getFullYear() - 18);
     dobInput.max = maxDate.toISOString().split('T')[0];
+
+    // Validate primary guest age on DOB change
+    dobInput.addEventListener('change', function() {
+        const dob = this.value;
+        if (dob && !validateDOB(dob)) {
+            showMessage('Age must be at least 18 years old to make a booking.', 'error');
+        } else if (dob) {
+            hideMessage();
+        }
+    });
+
+    // Add age validation for additional guests when they change their DOB
+    document.addEventListener('change', function(e) {
+        if (e.target.classList.contains('guest-input') && e.target.dataset.field === 'dob') {
+            const guestIndex = parseInt(e.target.dataset.guestIndex) + 2;
+            const dob = e.target.value;
+            if (dob && !validateDOB(dob)) {
+                showMessage(`Guest ${guestIndex}: Age must be at least 18 years old.`, 'error');
+            } else if (dob) {
+                hideMessage();
+            }
+        }
+    });
 });
