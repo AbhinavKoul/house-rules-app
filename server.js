@@ -32,6 +32,7 @@ const initDB = async () => {
       govt_id_number VARCHAR(100) NOT NULL,
       number_of_guests INTEGER DEFAULT 1,
       relationship_type VARCHAR(50),
+      additional_guests JSONB,
       acknowledged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       ip_address VARCHAR(45),
       UNIQUE(email)
@@ -49,6 +50,11 @@ const initDB = async () => {
       END;
       BEGIN
         ALTER TABLE acknowledgments ADD COLUMN relationship_type VARCHAR(50);
+      EXCEPTION
+        WHEN duplicate_column THEN NULL;
+      END;
+      BEGIN
+        ALTER TABLE acknowledgments ADD COLUMN additional_guests JSONB;
       EXCEPTION
         WHEN duplicate_column THEN NULL;
       END;
@@ -73,7 +79,7 @@ app.get('/', (req, res) => {
 
 // Submit acknowledgment
 app.post('/api/acknowledge', async (req, res) => {
-  const { name, email, dob, govtIdType, govtIdNumber, numberOfGuests, relationshipType } = req.body;
+  const { name, email, dob, govtIdType, govtIdNumber, numberOfGuests, relationshipType, additionalGuests } = req.body;
 
   // Validation
   if (!name || !email || !dob || !govtIdType || !govtIdNumber || !numberOfGuests) {
@@ -97,12 +103,31 @@ app.post('/api/acknowledge', async (req, res) => {
     return res.status(400).json({ error: 'Relationship type is required for multiple guests' });
   }
 
+  // Validate additional guests details
+  if (numGuests > 1) {
+    if (!additionalGuests || !Array.isArray(additionalGuests)) {
+      return res.status(400).json({ error: 'Additional guest details are required' });
+    }
+
+    if (additionalGuests.length !== numGuests - 1) {
+      return res.status(400).json({ error: 'Number of additional guests does not match' });
+    }
+
+    // Validate each additional guest
+    for (let i = 0; i < additionalGuests.length; i++) {
+      const guest = additionalGuests[i];
+      if (!guest.name || !guest.dob || !guest.govtIdType || !guest.govtIdNumber) {
+        return res.status(400).json({ error: `Guest ${i + 2}: All fields are required` });
+      }
+    }
+  }
+
   const ipAddress = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
 
   try {
     const query = `
-      INSERT INTO acknowledgments (name, email, dob, govt_id_type, govt_id_number, number_of_guests, relationship_type, ip_address)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      INSERT INTO acknowledgments (name, email, dob, govt_id_type, govt_id_number, number_of_guests, relationship_type, additional_guests, ip_address)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING id, acknowledged_at
     `;
 
@@ -114,6 +139,7 @@ app.post('/api/acknowledge', async (req, res) => {
       govtIdNumber,
       numGuests,
       numGuests > 1 ? relationshipType : null,
+      numGuests > 1 ? JSON.stringify(additionalGuests) : null,
       ipAddress
     ]);
 
@@ -135,7 +161,7 @@ app.post('/api/acknowledge', async (req, res) => {
 app.get('/api/acknowledgments', async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, name, email, dob, govt_id_type, govt_id_number, number_of_guests, relationship_type, acknowledged_at FROM acknowledgments ORDER BY acknowledged_at DESC'
+      'SELECT id, name, email, dob, govt_id_type, govt_id_number, number_of_guests, relationship_type, additional_guests, acknowledged_at FROM acknowledgments ORDER BY acknowledged_at DESC'
     );
     res.json(result.rows);
   } catch (err) {

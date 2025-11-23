@@ -222,6 +222,26 @@ header p {
     color: #856404;
 }
 
+.additional-guest-section {
+    margin: 25px 0;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+}
+
+.additional-guest-section h3 {
+    color: #667eea;
+    margin-bottom: 15px;
+    font-size: 1.3em;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #667eea;
+}
+
+#additionalGuestsContainer {
+    margin-top: 20px;
+}
+
 @media (max-width: 768px) {
     header h1 {
         font-size: 2em;

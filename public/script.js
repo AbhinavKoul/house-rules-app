@@ -6,18 +6,71 @@ document.addEventListener('DOMContentLoaded', function() {
     const relationshipGroup = document.getElementById('relationshipGroup');
     const relationshipTypeSelect = document.getElementById('relationshipType');
 
-    // Show/hide relationship field based on number of guests
+    // Show/hide relationship field and generate additional guest forms based on number of guests
     numberOfGuestsInput.addEventListener('input', function() {
         const numGuests = parseInt(this.value);
         if (numGuests > 1) {
             relationshipGroup.style.display = 'block';
             relationshipTypeSelect.required = true;
+            generateAdditionalGuestForms(numGuests - 1);
         } else {
             relationshipGroup.style.display = 'none';
             relationshipTypeSelect.required = false;
             relationshipTypeSelect.value = '';
+            clearAdditionalGuestForms();
         }
     });
+
+    function generateAdditionalGuestForms(numAdditionalGuests) {
+        const container = document.getElementById('additionalGuestsContainer');
+        container.innerHTML = '';
+
+        for (let i = 0; i < numAdditionalGuests; i++) {
+            const guestNumber = i + 2;
+            const guestSection = document.createElement('div');
+            guestSection.className = 'additional-guest-section';
+            guestSection.innerHTML = `
+                <h3>Guest ${guestNumber} Details</h3>
+
+                <div class="form-group">
+                    <label for="guest${i}_name">Full Name *</label>
+                    <input type="text" id="guest${i}_name" name="guest${i}_name" class="guest-input" data-guest-index="${i}" data-field="name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="guest${i}_dob">Date of Birth *</label>
+                    <input type="date" id="guest${i}_dob" name="guest${i}_dob" class="guest-input" data-guest-index="${i}" data-field="dob" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="guest${i}_govtIdType">Government ID Type *</label>
+                    <select id="guest${i}_govtIdType" name="guest${i}_govtIdType" class="guest-input" data-guest-index="${i}" data-field="govtIdType" required>
+                        <option value="">Select ID Type</option>
+                        <option value="Aadhar">Aadhar Card</option>
+                        <option value="Driving License">Driving License</option>
+                        <option value="Passport">Passport</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="guest${i}_govtIdNumber">Government ID Number *</label>
+                    <input type="text" id="guest${i}_govtIdNumber" name="guest${i}_govtIdNumber" class="guest-input" data-guest-index="${i}" data-field="govtIdNumber" required>
+                </div>
+            `;
+            container.appendChild(guestSection);
+
+            // Set max date for DOB (must be at least 18 years old)
+            const guestDobInput = document.getElementById(`guest${i}_dob`);
+            const maxDate = new Date();
+            maxDate.setFullYear(maxDate.getFullYear() - 18);
+            guestDobInput.max = maxDate.toISOString().split('T')[0];
+        }
+    }
+
+    function clearAdditionalGuestForms() {
+        const container = document.getElementById('additionalGuestsContainer');
+        container.innerHTML = '';
+    }
 
     // Check if email already acknowledged on blur
     emailInput.addEventListener('blur', async function() {
@@ -51,8 +104,29 @@ document.addEventListener('DOMContentLoaded', function() {
             govtIdType: document.getElementById('govtIdType').value,
             govtIdNumber: document.getElementById('govtIdNumber').value.trim(),
             numberOfGuests: numberOfGuests,
-            relationshipType: numberOfGuests > 1 ? document.getElementById('relationshipType').value : null
+            relationshipType: numberOfGuests > 1 ? document.getElementById('relationshipType').value : null,
+            additionalGuests: []
         };
+
+        // Collect additional guest data if there are multiple guests
+        if (numberOfGuests > 1) {
+            const guestInputs = document.querySelectorAll('.guest-input');
+            const guestDataMap = {};
+
+            guestInputs.forEach(input => {
+                const guestIndex = input.dataset.guestIndex;
+                const field = input.dataset.field;
+
+                if (!guestDataMap[guestIndex]) {
+                    guestDataMap[guestIndex] = {};
+                }
+
+                guestDataMap[guestIndex][field] = input.value.trim();
+            });
+
+            // Convert map to array
+            formData.additionalGuests = Object.values(guestDataMap);
+        }
 
         // Validate checkboxes
         const confirmRead = document.getElementById('confirmRead').checked;
@@ -92,6 +166,31 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
+        // Validate additional guests data
+        if (numberOfGuests > 1) {
+            if (formData.additionalGuests.length !== numberOfGuests - 1) {
+                showMessage('Please fill in all additional guest details.', 'error');
+                return;
+            }
+
+            for (let i = 0; i < formData.additionalGuests.length; i++) {
+                const guest = formData.additionalGuests[i];
+                const guestNum = i + 2;
+
+                // Validate DOB
+                if (!validateDOB(guest.dob)) {
+                    showMessage(`Guest ${guestNum}: Please enter a valid date of birth. Must be at least 18 years old.`, 'error');
+                    return;
+                }
+
+                // Validate government ID
+                if (!validateGovtId(guest.govtIdType, guest.govtIdNumber)) {
+                    showMessage(`Guest ${guestNum}: Please enter a valid government ID number.`, 'error');
+                    return;
+                }
+            }
+        }
+
         // Disable submit button
         const submitBtn = form.querySelector('button[type="submit"]');
         submitBtn.disabled = true;
@@ -115,6 +214,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Reset relationship group visibility
                 relationshipGroup.style.display = 'none';
                 relationshipTypeSelect.required = false;
+
+                // Clear additional guest forms
+                clearAdditionalGuestForms();
 
                 // Scroll to message
                 messageDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
