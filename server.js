@@ -34,9 +34,12 @@ const initDB = async () => {
       number_of_children INTEGER DEFAULT 0,
       relationship_type VARCHAR(50),
       additional_guests JSONB,
+      check_in_date DATE NOT NULL,
+      check_out_date DATE NOT NULL,
+      cancelled BOOLEAN DEFAULT FALSE,
       acknowledged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       ip_address VARCHAR(45),
-      UNIQUE(email)
+      UNIQUE(check_in_date, check_out_date, cancelled) WHERE cancelled = FALSE
     );
   `;
 
@@ -64,12 +67,38 @@ const initDB = async () => {
       EXCEPTION
         WHEN duplicate_column THEN NULL;
       END;
+      BEGIN
+        ALTER TABLE acknowledgments ADD COLUMN check_in_date DATE;
+      EXCEPTION
+        WHEN duplicate_column THEN NULL;
+      END;
+      BEGIN
+        ALTER TABLE acknowledgments ADD COLUMN check_out_date DATE;
+      EXCEPTION
+        WHEN duplicate_column THEN NULL;
+      END;
+      BEGIN
+        ALTER TABLE acknowledgments ADD COLUMN cancelled BOOLEAN DEFAULT FALSE;
+      EXCEPTION
+        WHEN duplicate_column THEN NULL;
+      END;
+    END $$;
+  `;
+
+  // Drop old email unique constraint if it exists
+  const dropEmailConstraintQuery = `
+    DO $$
+    BEGIN
+      ALTER TABLE acknowledgments DROP CONSTRAINT IF EXISTS acknowledgments_email_key;
+    EXCEPTION
+      WHEN undefined_object THEN NULL;
     END $$;
   `;
 
   try {
     await pool.query(createTableQuery);
     await pool.query(alterTableQuery);
+    await pool.query(dropEmailConstraintQuery);
     console.log('Database table initialized successfully');
   } catch (err) {
     console.error('Error initializing database:', err);
@@ -85,11 +114,25 @@ app.get('/', (req, res) => {
 
 // Submit acknowledgment
 app.post('/api/acknowledge', async (req, res) => {
-  const { name, email, dob, govtIdType, govtIdNumber, numberOfGuests, numberOfChildren, relationshipType, additionalGuests } = req.body;
+  const { name, email, dob, govtIdType, govtIdNumber, numberOfGuests, numberOfChildren, relationshipType, additionalGuests, checkInDate, checkOutDate } = req.body;
 
   // Validation
-  if (!name || !email || !dob || !govtIdType || !govtIdNumber || !numberOfGuests) {
+  if (!name || !email || !dob || !govtIdType || !govtIdNumber || !numberOfGuests || !checkInDate || !checkOutDate) {
     return res.status(400).json({ error: 'All fields are required' });
+  }
+
+  // Validate dates
+  const checkIn = new Date(checkInDate);
+  const checkOut = new Date(checkOutDate);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (checkIn < today) {
+    return res.status(400).json({ error: 'Check-in date cannot be in the past' });
+  }
+
+  if (checkOut <= checkIn) {
+    return res.status(400).json({ error: 'Check-out date must be after check-in date' });
   }
 
   // Email validation
@@ -138,10 +181,27 @@ app.post('/api/acknowledge', async (req, res) => {
   const ipAddress = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
 
   try {
+    // Check for overlapping bookings
+    const overlapQuery = `
+      SELECT id FROM acknowledgments
+      WHERE cancelled = FALSE
+      AND (
+        (check_in_date <= $1 AND check_out_date > $1) OR
+        (check_in_date < $2 AND check_out_date >= $2) OR
+        (check_in_date >= $1 AND check_out_date <= $2)
+      )
+    `;
+
+    const overlapResult = await pool.query(overlapQuery, [checkInDate, checkOutDate]);
+
+    if (overlapResult.rows.length > 0) {
+      return res.status(409).json({ error: 'These dates are already booked. Please select different dates.' });
+    }
+
     const query = `
-      INSERT INTO acknowledgments (name, email, dob, govt_id_type, govt_id_number, number_of_guests, number_of_children, relationship_type, additional_guests, ip_address)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-      RETURNING id, acknowledged_at
+      INSERT INTO acknowledgments (name, email, dob, govt_id_type, govt_id_number, number_of_guests, number_of_children, relationship_type, additional_guests, check_in_date, check_out_date, ip_address)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      RETURNING id, acknowledged_at, check_in_date, check_out_date
     `;
 
     const result = await pool.query(query, [
@@ -154,6 +214,8 @@ app.post('/api/acknowledge', async (req, res) => {
       numChildren,
       totalPeople > 1 ? relationshipType : null,
       numGuests > 1 ? JSON.stringify(additionalGuests) : null,
+      checkInDate,
+      checkOutDate,
       ipAddress
     ]);
 
@@ -164,7 +226,7 @@ app.post('/api/acknowledge', async (req, res) => {
     });
   } catch (err) {
     if (err.code === '23505') {
-      return res.status(409).json({ error: 'This email has already acknowledged the house rules' });
+      return res.status(409).json({ error: 'These dates are already booked' });
     }
     console.error('Database error:', err);
     res.status(500).json({ error: 'Failed to record acknowledgment' });
@@ -175,7 +237,7 @@ app.post('/api/acknowledge', async (req, res) => {
 app.get('/api/acknowledgments', async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, name, email, dob, govt_id_type, govt_id_number, number_of_guests, number_of_children, relationship_type, additional_guests, acknowledged_at FROM acknowledgments ORDER BY acknowledged_at DESC'
+      'SELECT id, name, email, dob, govt_id_type, govt_id_number, number_of_guests, number_of_children, relationship_type, additional_guests, check_in_date, check_out_date, cancelled, acknowledged_at FROM acknowledgments ORDER BY check_in_date DESC'
     );
     res.json(result.rows);
   } catch (err) {
@@ -184,19 +246,53 @@ app.get('/api/acknowledgments', async (req, res) => {
   }
 });
 
-// Check if email already acknowledged
-app.get('/api/check-email/:email', async (req, res) => {
+// Get blocked dates (for frontend date picker)
+app.get('/api/blocked-dates', async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id FROM acknowledgments WHERE email = $1',
-      [req.params.email]
+      'SELECT check_in_date, check_out_date FROM acknowledgments WHERE cancelled = FALSE ORDER BY check_in_date'
     );
-    res.json({ exists: result.rows.length > 0 });
+    res.json(result.rows);
   } catch (err) {
     console.error('Database error:', err);
-    res.status(500).json({ error: 'Failed to check email' });
+    res.status(500).json({ error: 'Failed to fetch blocked dates' });
   }
 });
+
+// Cancel booking (host override to unblock dates)
+app.post('/api/cancel-booking', async (req, res) => {
+  const { bookingId, hostKey } = req.body;
+
+  // Simple host key validation (in production, use proper authentication)
+  if (hostKey !== process.env.HOST_KEY && hostKey !== 'host-override-key-2024') {
+    return res.status(403).json({ error: 'Unauthorized: Invalid host key' });
+  }
+
+  if (!bookingId) {
+    return res.status(400).json({ error: 'Booking ID is required' });
+  }
+
+  try {
+    const result = await pool.query(
+      'UPDATE acknowledgments SET cancelled = TRUE WHERE id = $1 RETURNING id, check_in_date, check_out_date',
+      [bookingId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Booking cancelled successfully. Dates are now available.',
+      data: result.rows[0]
+    });
+  } catch (err) {
+    console.error('Database error:', err);
+    res.status(500).json({ error: 'Failed to cancel booking' });
+  }
+});
+
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

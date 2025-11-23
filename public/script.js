@@ -6,6 +6,75 @@ document.addEventListener('DOMContentLoaded', function() {
     const numberOfChildrenInput = document.getElementById('numberOfChildren');
     const relationshipGroup = document.getElementById('relationshipGroup');
     const relationshipTypeSelect = document.getElementById('relationshipType');
+    const checkInDateInput = document.getElementById('checkInDate');
+    const checkOutDateInput = document.getElementById('checkOutDate');
+
+    let blockedDates = [];
+
+    // Set minimum date to today for check-in
+    const today = new Date().toISOString().split('T')[0];
+    checkInDateInput.min = today;
+
+    // Fetch blocked dates from API
+    async function fetchBlockedDates() {
+        try {
+            const response = await fetch('/api/blocked-dates');
+            const data = await response.json();
+            blockedDates = data;
+            console.log('Blocked dates loaded:', blockedDates);
+        } catch (error) {
+            console.error('Error fetching blocked dates:', error);
+        }
+    }
+
+    // Check if a date falls within any blocked range
+    function isDateBlocked(dateString) {
+        const checkDate = new Date(dateString);
+        return blockedDates.some(booking => {
+            const checkIn = new Date(booking.check_in_date);
+            const checkOut = new Date(booking.check_out_date);
+            return checkDate >= checkIn && checkDate < checkOut;
+        });
+    }
+
+    // Update check-out min date when check-in changes
+    checkInDateInput.addEventListener('change', function() {
+        const checkInDate = new Date(this.value);
+        checkInDate.setDate(checkInDate.getDate() + 1);
+        checkOutDateInput.min = checkInDate.toISOString().split('T')[0];
+
+        // Validate the selected dates don't overlap with bookings
+        validateDateSelection();
+    });
+
+    checkOutDateInput.addEventListener('change', validateDateSelection);
+
+    function validateDateSelection() {
+        const checkIn = checkInDateInput.value;
+        const checkOut = checkOutDateInput.value;
+
+        if (!checkIn || !checkOut) return;
+
+        const checkInDate = new Date(checkIn);
+        const checkOutDate = new Date(checkOut);
+
+        // Check each day in the range
+        let currentDate = new Date(checkInDate);
+        while (currentDate < checkOutDate) {
+            const dateString = currentDate.toISOString().split('T')[0];
+            if (isDateBlocked(dateString)) {
+                showMessage('Selected dates overlap with an existing booking. Please choose different dates.', 'error');
+                checkOutDateInput.value = '';
+                return;
+            }
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+
+        hideMessage();
+    }
+
+    // Load blocked dates on page load
+    fetchBlockedDates();
 
     // Function to update relationship and forms based on total people
     function updateRelationshipAndForms() {
@@ -123,6 +192,8 @@ document.addEventListener('DOMContentLoaded', function() {
             numberOfGuests: numberOfGuests,
             numberOfChildren: numberOfChildren,
             relationshipType: totalPeople > 1 ? document.getElementById('relationshipType').value : null,
+            checkInDate: document.getElementById('checkInDate').value,
+            checkOutDate: document.getElementById('checkOutDate').value,
             additionalGuests: []
         };
 
@@ -144,6 +215,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Convert map to array
             formData.additionalGuests = Object.values(guestDataMap);
+        }
+
+        // Validate check-in and check-out dates
+        if (!formData.checkInDate || !formData.checkOutDate) {
+            showMessage('Please select check-in and check-out dates.', 'error');
+            return;
         }
 
         // Validate checkboxes
