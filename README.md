@@ -363,20 +363,35 @@ git push -u origin master
 
 ## Admin Access
 
-### View All Bookings
-To view all acknowledgments, make a GET request to:
+### Admin Interface (Recommended)
+Access the visual admin interface to manage bookings:
+```
+https://your-app-name.herokuapp.com/admin.html
+```
+
+Features:
+- View all bookings in a table format
+- See booking status (Active/Cancelled)
+- Cancel bookings with one click
+- Host key authentication required
+- Real-time updates after cancellation
+
+### API Access (Alternative)
+
+#### View All Bookings
+Make a GET request to:
 ```
 https://your-app-name.herokuapp.com/api/acknowledgments
 ```
 
-### View Blocked Dates
-To view all booked date ranges:
+#### View Blocked Dates
+Get all booked date ranges:
 ```
 https://your-app-name.herokuapp.com/api/blocked-dates
 ```
 
-### Cancel a Booking
-To cancel a booking and free up dates, make a POST request:
+#### Cancel a Booking (API)
+Make a POST request:
 ```bash
 curl -X POST https://your-app-name.herokuapp.com/api/cancel-booking \
   -H "Content-Type: application/json" \
@@ -386,7 +401,7 @@ curl -X POST https://your-app-name.herokuapp.com/api/cancel-booking \
   }'
 ```
 
-**Note**: Consider adding more robust authentication for these endpoints in production.
+**Note**: The `/api/cancel-booking` endpoint only accepts POST requests. Accessing it via GET (like in a browser) will return "Cannot GET /api/cancel-booking".
 
 ## Security Considerations
 
