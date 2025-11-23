@@ -109,6 +109,99 @@
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
         }
+
+        .view-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            margin-right: 5px;
+        }
+
+        .view-btn:hover {
+            background: #5568d3;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 30px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            line-height: 20px;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: #000;
+        }
+
+        .detail-section {
+            margin-bottom: 25px;
+        }
+
+        .detail-section h3 {
+            color: #667eea;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 8px;
+            margin-bottom: 15px;
+        }
+
+        .detail-row {
+            display: grid;
+            grid-template-columns: 200px 1fr;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .detail-label {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .detail-value {
+            color: #666;
+        }
+
+        .guest-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border-left: 4px solid #667eea;
+        }
+
+        .guest-card h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
     </style>
 </head>
 <body>
@@ -131,8 +224,17 @@
         </div>
     </div>
 
+    <!-- Modal for booking details -->
+    <div id="detailsModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
     <script>
         let hostKey = '';
+        let allBookings = [];
 
         async function loadBookings() {
             hostKey = document.getElementById('hostKey').value.trim();
@@ -154,6 +256,9 @@
                     container.innerHTML = '<div class="loading">No bookings found</div>';
                     return;
                 }
+
+                // Store bookings for later access
+                allBookings = bookings;
 
                 // Sort by check-in date (newest first)
                 bookings.sort((a, b) => new Date(b.check_in_date) - new Date(a.check_in_date));
@@ -192,6 +297,7 @@
                             <td>${totalGuests} (${booking.number_of_guests}A, ${booking.number_of_children || 0}C)</td>
                             <td class="${statusClass}">${status}</td>
                             <td>
+                                <button class="view-btn" onclick="viewBookingDetails(${booking.id})">View</button>
                                 ${!booking.cancelled ?
                                     `<button class="cancel-btn" onclick="cancelBooking(${booking.id})">Cancel</button>` :
                                     '<span style="color: #999;">Cancelled</span>'
@@ -264,6 +370,143 @@
         function hideMessage() {
             const messageDiv = document.getElementById('message');
             messageDiv.className = 'message';
+        }
+
+        function viewBookingDetails(bookingId) {
+            const booking = allBookings.find(b => b.id === bookingId);
+            if (!booking) {
+                showMessage('Booking not found', 'error');
+                return;
+            }
+
+            const checkIn = new Date(booking.check_in_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            const checkOut = new Date(booking.check_out_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            const acknowledgedAt = new Date(booking.acknowledged_at).toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            const dob = new Date(booking.dob).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+            let html = `
+                <h2>Booking Details - ID #${booking.id}</h2>
+
+                <div class="detail-section">
+                    <h3>Primary Guest Information</h3>
+                    <div class="detail-row">
+                        <div class="detail-label">Full Name:</div>
+                        <div class="detail-value">${booking.name}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Email:</div>
+                        <div class="detail-value">${booking.email}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Date of Birth:</div>
+                        <div class="detail-value">${dob}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Government ID Type:</div>
+                        <div class="detail-value">${booking.govt_id_type}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Government ID Number:</div>
+                        <div class="detail-value">${booking.govt_id_number}</div>
+                    </div>
+                </div>
+
+                <div class="detail-section">
+                    <h3>Booking Information</h3>
+                    <div class="detail-row">
+                        <div class="detail-label">Check-In Date:</div>
+                        <div class="detail-value">${checkIn}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Check-Out Date:</div>
+                        <div class="detail-value">${checkOut}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Number of Adults:</div>
+                        <div class="detail-value">${booking.number_of_guests}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Number of Children:</div>
+                        <div class="detail-value">${booking.number_of_children || 0}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Total Guests:</div>
+                        <div class="detail-value">${booking.number_of_guests + (booking.number_of_children || 0)}</div>
+                    </div>
+                    ${booking.relationship_type ? `
+                    <div class="detail-row">
+                        <div class="detail-label">Relationship Type:</div>
+                        <div class="detail-value">${booking.relationship_type}</div>
+                    </div>
+                    ` : ''}
+                    <div class="detail-row">
+                        <div class="detail-label">Status:</div>
+                        <div class="detail-value ${booking.cancelled ? 'status-cancelled' : 'status-active'}">
+                            ${booking.cancelled ? 'Cancelled' : 'Active'}
+                        </div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Acknowledged At:</div>
+                        <div class="detail-value">${acknowledgedAt}</div>
+                    </div>
+                    ${booking.ip_address ? `
+                    <div class="detail-row">
+                        <div class="detail-label">IP Address:</div>
+                        <div class="detail-value">${booking.ip_address}</div>
+                    </div>
+                    ` : ''}
+                </div>
+            `;
+
+            // Add additional guests section if there are any
+            if (booking.additional_guests && booking.additional_guests.length > 0) {
+                html += `
+                    <div class="detail-section">
+                        <h3>Additional Adult Guests (${booking.additional_guests.length})</h3>
+                `;
+
+                booking.additional_guests.forEach((guest, index) => {
+                    const guestDob = new Date(guest.dob).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+                    html += `
+                        <div class="guest-card">
+                            <h4>Guest ${index + 2}</h4>
+                            <div class="detail-row">
+                                <div class="detail-label">Full Name:</div>
+                                <div class="detail-value">${guest.name}</div>
+                            </div>
+                            <div class="detail-row">
+                                <div class="detail-label">Date of Birth:</div>
+                                <div class="detail-value">${guestDob}</div>
+                            </div>
+                            <div class="detail-row">
+                                <div class="detail-label">Government ID Type:</div>
+                                <div class="detail-value">${guest.govtIdType}</div>
+                            </div>
+                            <div class="detail-row">
+                                <div class="detail-label">Government ID Number:</div>
+                                <div class="detail-value">${guest.govtIdNumber}</div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html += '</div>';
+            }
+
+            document.getElementById('modalContent').innerHTML = html;
+            document.getElementById('detailsModal').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('detailsModal').style.display = 'none';
+        }
+
+        // Close modal when clicking outside of it
+        window.onclick = function(event) {
+            const modal = document.getElementById('detailsModal');
+            if (event.target == modal) {
+                closeModal();
+            }
         }
     </script>
 </body>
