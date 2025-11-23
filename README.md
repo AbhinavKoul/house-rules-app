@@ -1,13 +1,159 @@
 # House Rules Acknowledgment App
 
-A web application for viewing and acknowledging house rules. Users can read a PDF of the house rules and submit their acknowledgment along with their personal information.
+A web application for viewing and acknowledging house rules. Users can read the house rules and submit their acknowledgment along with their personal information and booking dates.
+
+## API Documentation
+
+### Base URL
+- **Production**: `https://house-rules-acknowledgment-91bc2e7022ee.herokuapp.com`
+- **Local Development**: `http://localhost:3000`
+
+### Endpoints
+
+#### 1. GET `/`
+Main page with house rules viewer and acknowledgment form.
+
+**Response**: HTML page
+
+---
+
+#### 2. POST `/api/acknowledge`
+Submit a house rules acknowledgment with guest details and booking dates.
+
+**Request Body**:
+```json
+{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "dob": "1990-05-15",
+  "govtIdType": "Aadhar",
+  "govtIdNumber": "123456789012",
+  "numberOfGuests": 2,
+  "numberOfChildren": 1,
+  "relationshipType": "Family Members",
+  "checkInDate": "2025-12-01",
+  "checkOutDate": "2025-12-05",
+  "additionalGuests": [
+    {
+      "name": "Jane Doe",
+      "dob": "1992-03-20",
+      "govtIdType": "Passport",
+      "govtIdNumber": "A1234567"
+    }
+  ]
+}
+```
+
+**Response** (200 OK):
+```json
+{
+  "success": true,
+  "message": "Acknowledgment recorded successfully",
+  "data": {
+    "id": 1,
+    "acknowledged_at": "2025-11-23T18:59:59.622Z",
+    "check_in_date": "2025-12-01",
+    "check_out_date": "2025-12-05"
+  }
+}
+```
+
+**Error Responses**:
+- `400 Bad Request`: Missing required fields or validation errors
+- `409 Conflict`: Selected dates overlap with existing booking
+
+---
+
+#### 3. GET `/api/acknowledgments`
+Retrieve all acknowledgments (admin endpoint).
+
+**Response** (200 OK):
+```json
+[
+  {
+    "id": 1,
+    "name": "John Doe",
+    "email": "john@example.com",
+    "dob": "1990-05-15",
+    "govt_id_type": "Aadhar",
+    "govt_id_number": "123456789012",
+    "number_of_guests": 2,
+    "number_of_children": 1,
+    "relationship_type": "Family Members",
+    "additional_guests": [...],
+    "check_in_date": "2025-12-01",
+    "check_out_date": "2025-12-05",
+    "cancelled": false,
+    "acknowledged_at": "2025-11-23T18:59:59.622Z"
+  }
+]
+```
+
+---
+
+#### 4. GET `/api/blocked-dates`
+Get all booked date ranges (for preventing double bookings).
+
+**Response** (200 OK):
+```json
+[
+  {
+    "check_in_date": "2025-12-01",
+    "check_out_date": "2025-12-05"
+  },
+  {
+    "check_in_date": "2025-12-10",
+    "check_out_date": "2025-12-15"
+  }
+]
+```
+
+---
+
+#### 5. POST `/api/cancel-booking`
+Cancel a booking to free up dates (host override - requires authentication).
+
+**Request Body**:
+```json
+{
+  "bookingId": 1,
+  "hostKey": "your-host-key"
+}
+```
+
+**Response** (200 OK):
+```json
+{
+  "success": true,
+  "message": "Booking cancelled successfully. Dates are now available.",
+  "data": {
+    "id": 1,
+    "check_in_date": "2025-12-01",
+    "check_out_date": "2025-12-05"
+  }
+}
+```
+
+**Error Responses**:
+- `403 Forbidden`: Invalid host key
+- `404 Not Found`: Booking ID not found
+
+**Environment Variable Required**:
+Set `HOST_KEY` in your environment variables for authentication.
+
+---
 
 ## Features
 
-- PDF viewer for house rules document
+- HTML viewer for house rules document
 - User acknowledgment form with validation
 - PostgreSQL database to store acknowledgments
-- Prevents duplicate submissions (by email)
+- Date booking system with overlap prevention
+- Blocked dates calendar to prevent double bookings
+- Support for multiple adults and children
+- Individual ID collection for adult guests
+- Host override API to cancel bookings
+- Same guest can book multiple times with different dates
 - Responsive design for mobile and desktop
 - Ready for Heroku deployment
 
@@ -48,6 +194,7 @@ A web application for viewing and acknowledging house rules. Users can read a PD
    DATABASE_URL=postgresql://username:password@localhost:5432/house_rules_db
    NODE_ENV=development
    PORT=3000
+   HOST_KEY=your-secret-host-key-for-cancellations
    ```
 
 4. **Set up local PostgreSQL database**
@@ -80,21 +227,26 @@ The application uses a single table to store acknowledgments:
 CREATE TABLE acknowledgments (
   id SERIAL PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
-  email VARCHAR(255) NOT NULL UNIQUE,
+  email VARCHAR(255) NOT NULL,
   dob DATE NOT NULL,
   govt_id_type VARCHAR(50) NOT NULL,
   govt_id_number VARCHAR(100) NOT NULL,
+  number_of_guests INTEGER DEFAULT 1,
+  number_of_children INTEGER DEFAULT 0,
+  relationship_type VARCHAR(50),
+  additional_guests JSONB,
+  check_in_date DATE NOT NULL,
+  check_out_date DATE NOT NULL,
+  cancelled BOOLEAN DEFAULT FALSE,
   acknowledged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   ip_address VARCHAR(45)
 );
+
+-- Partial unique index to prevent duplicate bookings for same dates
+CREATE UNIQUE INDEX unique_active_booking_dates
+ON acknowledgments (check_in_date, check_out_date)
+WHERE cancelled = FALSE;
 ```
-
-## API Endpoints
-
-- `GET /` - Main page with PDF viewer and form
-- `POST /api/acknowledge` - Submit acknowledgment
-- `GET /api/acknowledgments` - Get all acknowledgments (admin)
-- `GET /api/check-email/:email` - Check if email already acknowledged
 
 ## Heroku Deployment
 
@@ -125,6 +277,9 @@ heroku addons:create heroku-postgresql:essential-0
 ```bash
 # Set production environment
 heroku config:set NODE_ENV=production
+
+# Set host key for booking cancellation API
+heroku config:set HOST_KEY=your-secret-host-key-here
 ```
 
 ### Step 4: Initialize Git and Deploy
@@ -208,12 +363,30 @@ git push -u origin master
 
 ## Admin Access
 
+### View All Bookings
 To view all acknowledgments, make a GET request to:
 ```
 https://your-app-name.herokuapp.com/api/acknowledgments
 ```
 
-Consider adding authentication for this endpoint in production.
+### View Blocked Dates
+To view all booked date ranges:
+```
+https://your-app-name.herokuapp.com/api/blocked-dates
+```
+
+### Cancel a Booking
+To cancel a booking and free up dates, make a POST request:
+```bash
+curl -X POST https://your-app-name.herokuapp.com/api/cancel-booking \
+  -H "Content-Type: application/json" \
+  -d '{
+    "bookingId": 1,
+    "hostKey": "your-host-key"
+  }'
+```
+
+**Note**: Consider adding more robust authentication for these endpoints in production.
 
 ## Security Considerations
 
@@ -227,13 +400,22 @@ Consider adding authentication for this endpoint in production.
 
 The app includes both client-side and server-side validation:
 
-- Email format validation
-- Age verification (must be 18+)
-- Government ID format validation:
+- **Email format validation**: Standard email regex pattern
+- **Age verification**: All adults must be 18+ years old
+- **Government ID format validation**:
   - Aadhar: 12 digits
   - Driving License: 8-20 alphanumeric characters
   - Passport: 6-10 alphanumeric characters
-- Duplicate email prevention
+- **Number of guests**: Minimum 1 adult, children can be 0 or more
+- **Relationship type**: Required when total people (adults + children) > 1
+  - Options: "Married Couple" or "Family Members"
+  - Unmarried couples are not allowed
+- **Additional guest details**: Required for each adult guest beyond the first
+- **Date validation**:
+  - Check-in date cannot be in the past
+  - Check-out date must be after check-in date
+  - Date range cannot overlap with existing bookings
+  - Blocked dates are fetched and validated in real-time
 
 ## Troubleshooting
 
