@@ -202,6 +202,120 @@
             color: #667eea;
             margin-bottom: 10px;
         }
+
+        /* Mobile Responsiveness for Admin */
+        @media (max-width: 768px) {
+            .admin-container {
+                padding: 10px;
+            }
+
+            header {
+                padding: 15px 10px;
+            }
+
+            header h1 {
+                font-size: 1.8em;
+            }
+
+            header p {
+                font-size: 0.9em;
+            }
+
+            .auth-section {
+                padding: 15px;
+            }
+
+            .auth-input {
+                font-size: 16px; /* Prevents zoom on iOS */
+                padding: 12px;
+            }
+
+            .refresh-btn {
+                margin-left: 0;
+                margin-top: 10px;
+                width: 100%;
+                padding: 12px;
+            }
+
+            .bookings-table {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            table {
+                font-size: 0.85em;
+                min-width: 800px; /* Allows horizontal scrolling */
+            }
+
+            th, td {
+                padding: 8px 6px;
+                white-space: nowrap;
+            }
+
+            .view-btn, .cancel-btn {
+                padding: 4px 8px;
+                font-size: 0.85em;
+            }
+
+            .modal-content {
+                width: 95%;
+                margin: 10% auto;
+                padding: 20px;
+                max-height: 85vh;
+            }
+
+            .detail-row {
+                grid-template-columns: 1fr;
+                gap: 5px;
+            }
+
+            .detail-label {
+                font-weight: 700;
+            }
+
+            .detail-value {
+                padding-left: 0;
+                margin-bottom: 10px;
+            }
+
+            .guest-card {
+                padding: 12px;
+            }
+
+            .close {
+                font-size: 32px;
+            }
+
+            h2 {
+                font-size: 1.3em;
+            }
+
+            .detail-section h3 {
+                font-size: 1.1em;
+            }
+        }
+
+        @media (max-width: 576px) {
+            header h1 {
+                font-size: 1.5em;
+            }
+
+            .auth-section {
+                padding: 12px;
+            }
+
+            table {
+                font-size: 0.75em;
+            }
+
+            .modal-content {
+                padding: 15px;
+            }
+
+            h2 {
+                font-size: 1.2em;
+            }
+        }
     </style>
 </head>
 <body>
