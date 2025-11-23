@@ -38,8 +38,7 @@ const initDB = async () => {
       check_out_date DATE NOT NULL,
       cancelled BOOLEAN DEFAULT FALSE,
       acknowledged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      ip_address VARCHAR(45),
-      UNIQUE(check_in_date, check_out_date, cancelled) WHERE cancelled = FALSE
+      ip_address VARCHAR(45)
     );
   `;
 
@@ -95,10 +94,18 @@ const initDB = async () => {
     END $$;
   `;
 
+  // Create partial unique index to prevent duplicate bookings for same dates
+  const createUniqueIndexQuery = `
+    CREATE UNIQUE INDEX IF NOT EXISTS unique_active_booking_dates
+    ON acknowledgments (check_in_date, check_out_date)
+    WHERE cancelled = FALSE;
+  `;
+
   try {
     await pool.query(createTableQuery);
     await pool.query(alterTableQuery);
     await pool.query(dropEmailConstraintQuery);
+    await pool.query(createUniqueIndexQuery);
     console.log('Database table initialized successfully');
   } catch (err) {
     console.error('Error initializing database:', err);
