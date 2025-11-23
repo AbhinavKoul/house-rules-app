@@ -60,6 +60,23 @@
                         <input type="text" id="govtIdNumber" name="govtIdNumber" required>
                     </div>
 
+                    <div class="form-group">
+                        <label for="numberOfGuests">Number of Guests *</label>
+                        <input type="number" id="numberOfGuests" name="numberOfGuests" min="1" value="1" required>
+                    </div>
+
+                    <div class="form-group" id="relationshipGroup" style="display: none;">
+                        <label for="relationshipType">Relationship with Additional Guest(s) *</label>
+                        <select id="relationshipType" name="relationshipType">
+                            <option value="">Select Relationship</option>
+                            <option value="Married Couple">Married Couple</option>
+                            <option value="Family Members">Family Members</option>
+                        </select>
+                        <div class="warning-banner">
+                            <strong>Note:</strong> Unmarried couples are not allowed. Please ensure you select the appropriate relationship type.
+                        </div>
+                    </div>
+
                     <div class="form-group checkbox-group">
                         <label>
                             <input type="checkbox" id="confirmRead" required>

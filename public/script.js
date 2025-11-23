@@ -2,6 +2,22 @@ document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('acknowledgmentForm');
     const messageDiv = document.getElementById('message');
     const emailInput = document.getElementById('email');
+    const numberOfGuestsInput = document.getElementById('numberOfGuests');
+    const relationshipGroup = document.getElementById('relationshipGroup');
+    const relationshipTypeSelect = document.getElementById('relationshipType');
+
+    // Show/hide relationship field based on number of guests
+    numberOfGuestsInput.addEventListener('input', function() {
+        const numGuests = parseInt(this.value);
+        if (numGuests > 1) {
+            relationshipGroup.style.display = 'block';
+            relationshipTypeSelect.required = true;
+        } else {
+            relationshipGroup.style.display = 'none';
+            relationshipTypeSelect.required = false;
+            relationshipTypeSelect.value = '';
+        }
+    });
 
     // Check if email already acknowledged on blur
     emailInput.addEventListener('blur', async function() {
@@ -27,12 +43,15 @@ document.addEventListener('DOMContentLoaded', function() {
         hideMessage();
 
         // Get form data
+        const numberOfGuests = parseInt(document.getElementById('numberOfGuests').value);
         const formData = {
             name: document.getElementById('name').value.trim(),
             email: document.getElementById('email').value.trim(),
             dob: document.getElementById('dob').value,
             govtIdType: document.getElementById('govtIdType').value,
             govtIdNumber: document.getElementById('govtIdNumber').value.trim(),
+            numberOfGuests: numberOfGuests,
+            relationshipType: numberOfGuests > 1 ? document.getElementById('relationshipType').value : null
         };
 
         // Validate checkboxes
@@ -62,6 +81,17 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
+        // Validate number of guests and relationship
+        if (numberOfGuests < 1) {
+            showMessage('Number of guests must be at least 1.', 'error');
+            return;
+        }
+
+        if (numberOfGuests > 1 && !formData.relationshipType) {
+            showMessage('Please select the relationship with additional guest(s).', 'error');
+            return;
+        }
+
         // Disable submit button
         const submitBtn = form.querySelector('button[type="submit"]');
         submitBtn.disabled = true;
@@ -81,6 +111,10 @@ document.addEventListener('DOMContentLoaded', function() {
             if (response.ok) {
                 showMessage('Thank you! Your acknowledgment has been recorded successfully.', 'success');
                 form.reset();
+
+                // Reset relationship group visibility
+                relationshipGroup.style.display = 'none';
+                relationshipTypeSelect.required = false;
 
                 // Scroll to message
                 messageDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });

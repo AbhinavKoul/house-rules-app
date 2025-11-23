@@ -30,14 +30,34 @@ const initDB = async () => {
       dob DATE NOT NULL,
       govt_id_type VARCHAR(50) NOT NULL,
       govt_id_number VARCHAR(100) NOT NULL,
+      number_of_guests INTEGER DEFAULT 1,
+      relationship_type VARCHAR(50),
       acknowledged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       ip_address VARCHAR(45),
       UNIQUE(email)
     );
   `;
 
+  // Add new columns if they don't exist (for existing tables)
+  const alterTableQuery = `
+    DO $$
+    BEGIN
+      BEGIN
+        ALTER TABLE acknowledgments ADD COLUMN number_of_guests INTEGER DEFAULT 1;
+      EXCEPTION
+        WHEN duplicate_column THEN NULL;
+      END;
+      BEGIN
+        ALTER TABLE acknowledgments ADD COLUMN relationship_type VARCHAR(50);
+      EXCEPTION
+        WHEN duplicate_column THEN NULL;
+      END;
+    END $$;
+  `;
+
   try {
     await pool.query(createTableQuery);
+    await pool.query(alterTableQuery);
     console.log('Database table initialized successfully');
   } catch (err) {
     console.error('Error initializing database:', err);
@@ -53,10 +73,10 @@ app.get('/', (req, res) => {
 
 // Submit acknowledgment
 app.post('/api/acknowledge', async (req, res) => {
-  const { name, email, dob, govtIdType, govtIdNumber } = req.body;
+  const { name, email, dob, govtIdType, govtIdNumber, numberOfGuests, relationshipType } = req.body;
 
   // Validation
-  if (!name || !email || !dob || !govtIdType || !govtIdNumber) {
+  if (!name || !email || !dob || !govtIdType || !govtIdNumber || !numberOfGuests) {
     return res.status(400).json({ error: 'All fields are required' });
   }
 
@@ -66,12 +86,23 @@ app.post('/api/acknowledge', async (req, res) => {
     return res.status(400).json({ error: 'Invalid email format' });
   }
 
+  // Validate number of guests
+  const numGuests = parseInt(numberOfGuests);
+  if (isNaN(numGuests) || numGuests < 1) {
+    return res.status(400).json({ error: 'Number of guests must be at least 1' });
+  }
+
+  // If more than 1 guest, relationship type is required
+  if (numGuests > 1 && !relationshipType) {
+    return res.status(400).json({ error: 'Relationship type is required for multiple guests' });
+  }
+
   const ipAddress = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
 
   try {
     const query = `
-      INSERT INTO acknowledgments (name, email, dob, govt_id_type, govt_id_number, ip_address)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      INSERT INTO acknowledgments (name, email, dob, govt_id_type, govt_id_number, number_of_guests, relationship_type, ip_address)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING id, acknowledged_at
     `;
 
@@ -81,6 +112,8 @@ app.post('/api/acknowledge', async (req, res) => {
       dob,
       govtIdType,
       govtIdNumber,
+      numGuests,
+      numGuests > 1 ? relationshipType : null,
       ipAddress
     ]);
 
@@ -102,7 +135,7 @@ app.post('/api/acknowledge', async (req, res) => {
 app.get('/api/acknowledgments', async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, name, email, dob, govt_id_type, govt_id_number, acknowledged_at FROM acknowledgments ORDER BY acknowledged_at DESC'
+      'SELECT id, name, email, dob, govt_id_type, govt_id_number, number_of_guests, relationship_type, acknowledged_at FROM acknowledgments ORDER BY acknowledged_at DESC'
     );
     res.json(result.rows);
   } catch (err) {

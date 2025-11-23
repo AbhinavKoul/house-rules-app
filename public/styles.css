@@ -207,6 +207,21 @@ header p {
     border: 1px solid #bee5eb;
 }
 
+.warning-banner {
+    margin-top: 10px;
+    padding: 12px;
+    background-color: #fff3cd;
+    border: 1px solid #ffc107;
+    border-left: 4px solid #ffc107;
+    border-radius: 4px;
+    color: #856404;
+    font-size: 0.95em;
+}
+
+.warning-banner strong {
+    color: #856404;
+}
+
 @media (max-width: 768px) {
     header h1 {
         font-size: 2em;
