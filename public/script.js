@@ -3,23 +3,37 @@ document.addEventListener('DOMContentLoaded', function() {
     const messageDiv = document.getElementById('message');
     const emailInput = document.getElementById('email');
     const numberOfGuestsInput = document.getElementById('numberOfGuests');
+    const numberOfChildrenInput = document.getElementById('numberOfChildren');
     const relationshipGroup = document.getElementById('relationshipGroup');
     const relationshipTypeSelect = document.getElementById('relationshipType');
 
-    // Show/hide relationship field and generate additional guest forms based on number of guests
-    numberOfGuestsInput.addEventListener('input', function() {
-        const numGuests = parseInt(this.value);
-        if (numGuests > 1) {
+    // Function to update relationship and forms based on total people
+    function updateRelationshipAndForms() {
+        const numAdults = parseInt(numberOfGuestsInput.value) || 1;
+        const numChildren = parseInt(numberOfChildrenInput.value) || 0;
+        const totalPeople = numAdults + numChildren;
+
+        // Show relationship dropdown if total people > 1
+        if (totalPeople > 1) {
             relationshipGroup.style.display = 'block';
             relationshipTypeSelect.required = true;
-            generateAdditionalGuestForms(numGuests - 1);
         } else {
             relationshipGroup.style.display = 'none';
             relationshipTypeSelect.required = false;
             relationshipTypeSelect.value = '';
+        }
+
+        // Generate forms only for additional adults (not children)
+        if (numAdults > 1) {
+            generateAdditionalGuestForms(numAdults - 1);
+        } else {
             clearAdditionalGuestForms();
         }
-    });
+    }
+
+    // Event listeners for both adult and children inputs
+    numberOfGuestsInput.addEventListener('input', updateRelationshipAndForms);
+    numberOfChildrenInput.addEventListener('input', updateRelationshipAndForms);
 
     function generateAdditionalGuestForms(numAdditionalGuests) {
         const container = document.getElementById('additionalGuestsContainer');
@@ -30,7 +44,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const guestSection = document.createElement('div');
             guestSection.className = 'additional-guest-section';
             guestSection.innerHTML = `
-                <h3>Guest ${guestNumber} Details</h3>
+                <h3>Adult Guest ${guestNumber} Details</h3>
 
                 <div class="form-group">
                     <label for="guest${i}_name">Full Name *</label>
@@ -97,6 +111,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Get form data
         const numberOfGuests = parseInt(document.getElementById('numberOfGuests').value);
+        const numberOfChildren = parseInt(document.getElementById('numberOfChildren').value) || 0;
+        const totalPeople = numberOfGuests + numberOfChildren;
+
         const formData = {
             name: document.getElementById('name').value.trim(),
             email: document.getElementById('email').value.trim(),
@@ -104,11 +121,12 @@ document.addEventListener('DOMContentLoaded', function() {
             govtIdType: document.getElementById('govtIdType').value,
             govtIdNumber: document.getElementById('govtIdNumber').value.trim(),
             numberOfGuests: numberOfGuests,
-            relationshipType: numberOfGuests > 1 ? document.getElementById('relationshipType').value : null,
+            numberOfChildren: numberOfChildren,
+            relationshipType: totalPeople > 1 ? document.getElementById('relationshipType').value : null,
             additionalGuests: []
         };
 
-        // Collect additional guest data if there are multiple guests
+        // Collect additional adult guest data if there are multiple adults
         if (numberOfGuests > 1) {
             const guestInputs = document.querySelectorAll('.guest-input');
             const guestDataMap = {};
@@ -155,21 +173,27 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Validate number of guests and relationship
+        // Validate number of adults and children
         if (numberOfGuests < 1) {
-            showMessage('Number of guests must be at least 1.', 'error');
+            showMessage('Number of adults must be at least 1.', 'error');
             return;
         }
 
-        if (numberOfGuests > 1 && !formData.relationshipType) {
-            showMessage('Please select the relationship with additional guest(s).', 'error');
+        if (numberOfChildren < 0) {
+            showMessage('Number of children cannot be negative.', 'error');
             return;
         }
 
-        // Validate additional guests data
+        // Validate relationship type for multiple people
+        if (totalPeople > 1 && !formData.relationshipType) {
+            showMessage('Please select the relationship type when there are multiple people.', 'error');
+            return;
+        }
+
+        // Validate additional adult guests data
         if (numberOfGuests > 1) {
             if (formData.additionalGuests.length !== numberOfGuests - 1) {
-                showMessage('Please fill in all additional guest details.', 'error');
+                showMessage('Please fill in all additional adult guest details.', 'error');
                 return;
             }
 
@@ -179,13 +203,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 // Validate DOB
                 if (!validateDOB(guest.dob)) {
-                    showMessage(`Guest ${guestNum}: Please enter a valid date of birth. Must be at least 18 years old.`, 'error');
+                    showMessage(`Adult Guest ${guestNum}: Please enter a valid date of birth. Must be at least 18 years old.`, 'error');
                     return;
                 }
 
                 // Validate government ID
                 if (!validateGovtId(guest.govtIdType, guest.govtIdNumber)) {
-                    showMessage(`Guest ${guestNum}: Please enter a valid government ID number.`, 'error');
+                    showMessage(`Adult Guest ${guestNum}: Please enter a valid government ID number.`, 'error');
                     return;
                 }
             }

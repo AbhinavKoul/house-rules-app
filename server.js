@@ -31,6 +31,7 @@ const initDB = async () => {
       govt_id_type VARCHAR(50) NOT NULL,
       govt_id_number VARCHAR(100) NOT NULL,
       number_of_guests INTEGER DEFAULT 1,
+      number_of_children INTEGER DEFAULT 0,
       relationship_type VARCHAR(50),
       additional_guests JSONB,
       acknowledged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -45,6 +46,11 @@ const initDB = async () => {
     BEGIN
       BEGIN
         ALTER TABLE acknowledgments ADD COLUMN number_of_guests INTEGER DEFAULT 1;
+      EXCEPTION
+        WHEN duplicate_column THEN NULL;
+      END;
+      BEGIN
+        ALTER TABLE acknowledgments ADD COLUMN number_of_children INTEGER DEFAULT 0;
       EXCEPTION
         WHEN duplicate_column THEN NULL;
       END;
@@ -79,7 +85,7 @@ app.get('/', (req, res) => {
 
 // Submit acknowledgment
 app.post('/api/acknowledge', async (req, res) => {
-  const { name, email, dob, govtIdType, govtIdNumber, numberOfGuests, relationshipType, additionalGuests } = req.body;
+  const { name, email, dob, govtIdType, govtIdNumber, numberOfGuests, numberOfChildren, relationshipType, additionalGuests } = req.body;
 
   // Validation
   if (!name || !email || !dob || !govtIdType || !govtIdNumber || !numberOfGuests) {
@@ -92,32 +98,39 @@ app.post('/api/acknowledge', async (req, res) => {
     return res.status(400).json({ error: 'Invalid email format' });
   }
 
-  // Validate number of guests
+  // Validate number of guests (adults)
   const numGuests = parseInt(numberOfGuests);
   if (isNaN(numGuests) || numGuests < 1) {
-    return res.status(400).json({ error: 'Number of guests must be at least 1' });
+    return res.status(400).json({ error: 'Number of adults must be at least 1' });
   }
 
-  // If more than 1 guest, relationship type is required
-  if (numGuests > 1 && !relationshipType) {
-    return res.status(400).json({ error: 'Relationship type is required for multiple guests' });
+  // Validate number of children
+  const numChildren = numberOfChildren ? parseInt(numberOfChildren) : 0;
+  if (isNaN(numChildren) || numChildren < 0) {
+    return res.status(400).json({ error: 'Number of children must be 0 or more' });
   }
 
-  // Validate additional guests details
+  // If more than 1 adult or has children, relationship type is required
+  const totalPeople = numGuests + numChildren;
+  if (totalPeople > 1 && !relationshipType) {
+    return res.status(400).json({ error: 'Relationship type is required for multiple people' });
+  }
+
+  // Validate additional adult guests details (children don't need IDs)
   if (numGuests > 1) {
     if (!additionalGuests || !Array.isArray(additionalGuests)) {
-      return res.status(400).json({ error: 'Additional guest details are required' });
+      return res.status(400).json({ error: 'Additional adult guest details are required' });
     }
 
     if (additionalGuests.length !== numGuests - 1) {
-      return res.status(400).json({ error: 'Number of additional guests does not match' });
+      return res.status(400).json({ error: 'Number of additional adult guests does not match' });
     }
 
-    // Validate each additional guest
+    // Validate each additional adult guest
     for (let i = 0; i < additionalGuests.length; i++) {
       const guest = additionalGuests[i];
       if (!guest.name || !guest.dob || !guest.govtIdType || !guest.govtIdNumber) {
-        return res.status(400).json({ error: `Guest ${i + 2}: All fields are required` });
+        return res.status(400).json({ error: `Adult Guest ${i + 2}: All fields are required` });
       }
     }
   }
@@ -126,8 +139,8 @@ app.post('/api/acknowledge', async (req, res) => {
 
   try {
     const query = `
-      INSERT INTO acknowledgments (name, email, dob, govt_id_type, govt_id_number, number_of_guests, relationship_type, additional_guests, ip_address)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      INSERT INTO acknowledgments (name, email, dob, govt_id_type, govt_id_number, number_of_guests, number_of_children, relationship_type, additional_guests, ip_address)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING id, acknowledged_at
     `;
 
@@ -138,7 +151,8 @@ app.post('/api/acknowledge', async (req, res) => {
       govtIdType,
       govtIdNumber,
       numGuests,
-      numGuests > 1 ? relationshipType : null,
+      numChildren,
+      totalPeople > 1 ? relationshipType : null,
       numGuests > 1 ? JSON.stringify(additionalGuests) : null,
       ipAddress
     ]);
@@ -161,7 +175,7 @@ app.post('/api/acknowledge', async (req, res) => {
 app.get('/api/acknowledgments', async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, name, email, dob, govt_id_type, govt_id_number, number_of_guests, relationship_type, additional_guests, acknowledged_at FROM acknowledgments ORDER BY acknowledged_at DESC'
+      'SELECT id, name, email, dob, govt_id_type, govt_id_number, number_of_guests, number_of_children, relationship_type, additional_guests, acknowledged_at FROM acknowledgments ORDER BY acknowledged_at DESC'
     );
     res.json(result.rows);
   } catch (err) {

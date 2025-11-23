@@ -58,8 +58,15 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="numberOfGuests">Number of Guests *</label>
+                        <label for="numberOfGuests">Number of Adults (18+) *</label>
                         <input type="number" id="numberOfGuests" name="numberOfGuests" min="1" value="1" required>
+                        <small style="color: #666; font-size: 0.9em;">Adult guests require government ID</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="numberOfChildren">Number of Children (under 18)</label>
+                        <input type="number" id="numberOfChildren" name="numberOfChildren" min="0" value="0">
+                        <small style="color: #666; font-size: 0.9em;">Children do not need to provide ID details</small>
                     </div>
 
                     <div class="form-group" id="relationshipGroup" style="display: none;">
