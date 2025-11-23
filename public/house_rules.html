@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>House Rules PDF</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Georgia', serif;
+            background: white;
+            min-height: 100vh;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .container {
+            background: white;
+            max-width: 100%;
+            width: 100%;
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 16px;
+            opacity: 0.95;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .content h2 {
+            color: #667eea;
+            font-size: 22px;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #667eea;
+        }
+        
+        .content h2:first-child {
+            margin-top: 0;
+        }
+        
+        .content ul {
+            list-style: none;
+            margin-left: 0;
+        }
+        
+        .content li {
+            margin-bottom: 12px;
+            padding-left: 25px;
+            position: relative;
+            line-height: 1.6;
+            color: #333;
+        }
+        
+        .content li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #667eea;
+            font-weight: bold;
+        }
+        
+        .content strong {
+            color: #764ba2;
+        }
+        
+        .footer-note {
+            background: #f8f9fa;
+            padding: 20px;
+            margin-top: 30px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            font-style: italic;
+            color: #555;
+        }
+        
+        .button-container {
+            text-align: center;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        
+        .download-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .download-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+        
+        .download-btn:active {
+            transform: translateY(0);
+        }
+        
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            
+            .container {
+                box-shadow: none;
+                max-width: 100%;
+            }
+            
+            .button-container {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>House Rules</h1>
+            <p style="font-size: 18px; margin-bottom: 8px;"><strong>Shree Ganesh Kunj</strong></p>
+            <p style="font-size: 14px;">Designer Room in Villa - Free Garden, Gym, Parking & WiFi | Tech Hub | Lake Access | Bangalore</p>
+            <p style="font-size: 14px; margin-top: 12px;">
+                <a href="https://airbnb.co.in/h/shreeganeshkunj" target="_blank" style="color: white; text-decoration: none; background: rgba(255,255,255,0.2); padding: 8px 20px; border-radius: 5px; display: inline-block; font-weight: bold; border: 2px solid white;">📅 BOOK NOW!</a>
+            </p>
+        </div>
+        
+        <div class="content" id="content">
+            <p>We maintain a peaceful, family-friendly environment. Please read and respect these guidelines:</p>
+            
+            <h2>Check-in & Check-out</h2>
+            <ul>
+                <li>Check-in: 3:00 PM onwards</li>
+                <li>Check-out: 11:00 AM</li>
+                <li>Early check-in/late check-out subject to availability</li>
+            </ul>
+            
+            <h2>Guest Requirements</h2>
+            <ul>
+                <li>Valid government-issued photo ID required for all guests at check-in</li>
+                <li>Guest information must match booking details</li>
+                <li>Suitable for families, married couples, and solo business travelers</li>
+                <li>Maximum occupancy as per booking only</li>
+            </ul>
+            
+            <h2>Property Guidelines</h2>
+            <ul>
+                <li><strong>Vegetarian Premises</strong> - Only vegetarian food allowed. No meat, eggs, or seafood permitted</li>
+                <li><strong>Alcohol-Free Property</strong> - No alcoholic beverages allowed on premises</li>
+                <li><strong>No Smoking</strong> - Smoking strictly prohibited inside the property</li>
+                <li><strong>Quiet Hours</strong> - 10:00 PM to 7:00 AM - please be considerate of other residents</li>
+                <li><strong>No Parties or Events</strong> - This is a residential property</li>
+            </ul>
+            
+            <h2>Conduct & Safety</h2>
+            <ul>
+                <li>Treat the property and furnishings with care. Guests are liable for any damages</li>
+                <li>No illegal activities or substances permitted</li>
+                <li>Maintain respectful behavior with neighbors and other residents</li>
+                <li>Guests are responsible for their personal belongings and valuables</li>
+                <li>Report any issues or maintenance needs promptly to host</li>
+            </ul>
+            
+            <h2>Visitors</h2>
+            <ul>
+                <li>Unregistered visitors not allowed without prior host approval</li>
+                <li>All overnight guests must be included in the original booking</li>
+            </ul>
+            
+            <h2>Compliance</h2>
+            <ul>
+                <li>Adherence to all house rules is mandatory</li>
+                <li>Host reserves the right to terminate stay without refund for rule violations</li>
+                <li>Local laws and regulations must be followed at all times</li>
+            </ul>
+            
+            <div class="footer-note">
+                <strong>By booking, you agree to follow all house rules and maintain the peaceful atmosphere of our home.</strong>
+            </div>
+            
+            <h2>📍 Location & Distances</h2>
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-top: 20px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div>
+                        <strong style="color: #667eea;">🏢 Tech Parks</strong>
+                        <ul style="list-style: none; margin: 10px 0 0 0; padding: 0;">
+                            <li style="padding-left: 0; margin-bottom: 5px;">• Bagmane: 4 kms</li>
+                            <li style="padding-left: 0; margin-bottom: 5px;">• Manyata Tech Park: 13 kms</li>
+                            <li style="padding-left: 0; margin-bottom: 5px;">• Outer Ring Road: 4 kms</li>
+                            <li style="padding-left: 0; margin-bottom: 5px;">• Amazon: 4 kms</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <strong style="color: #667eea;">🏙️ City Landmarks</strong>
+                        <ul style="list-style: none; margin: 10px 0 0 0; padding: 0;">
+                            <li style="padding-left: 0; margin-bottom: 5px;">• MG Road: 7 kms</li>
+                            <li style="padding-left: 0; margin-bottom: 5px;">• Indiranagar: 3 kms</li>
+                        </ul>
+                        <strong style="color: #667eea; display: block; margin-top: 15px;">🌊 Nature</strong>
+                        <ul style="list-style: none; margin: 10px 0 0 0; padding: 0;">
+                            <li style="padding-left: 0; margin-bottom: 5px;">• Agara Lake: Walking distance</li>
+                            <li style="padding-left: 0; margin-bottom: 5px;">• Local Markets & Shops: 500m</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <script>
+        // PDF generation functionality available via browser print (Ctrl+P)
+    </script>
+</body>
+</html>
