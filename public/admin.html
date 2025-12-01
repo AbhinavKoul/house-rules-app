@@ -568,6 +568,28 @@
             return 'active';
         }
 
+        // Helper function to check if booking is editable (within 4 days of completion)
+        function isBookingEditable(booking) {
+            // Cancelled bookings are not editable
+            if (booking.cancelled) {
+                return false;
+            }
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const checkOutDate = new Date(booking.check_out_date);
+            checkOutDate.setHours(0, 0, 0, 0);
+
+            // Active bookings are always editable
+            if (checkOutDate >= today) {
+                return true;
+            }
+
+            // For completed bookings, check if within 4 days
+            const daysSinceCheckout = Math.floor((today - checkOutDate) / (1000 * 60 * 60 * 24));
+            return daysSinceCheckout <= 4;
+        }
+
         async function loadBookings() {
             hostKey = document.getElementById('hostKey').value.trim();
 
@@ -903,9 +925,15 @@
             const checkOut = new Date(booking.check_out_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
             const acknowledgedAt = new Date(booking.acknowledged_at).toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
             const dob = new Date(booking.dob).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+            const isEditable = isBookingEditable(booking);
 
             let html = `
                 <h2>Booking Details - ID #${booking.id}</h2>
+                ${!isEditable ? `
+                    <div style="background: #fff3cd; border: 1px solid #ffc107; color: #856404; padding: 12px; border-radius: 6px; margin-bottom: 20px;">
+                        <strong>ℹ️ Note:</strong> This booking is no longer editable. Edit access is only available for active bookings and up to 4 days after checkout.
+                    </div>
+                ` : ''}
 
                 <div class="detail-section">
                     <h3>Primary Guest Information</h3>
@@ -922,7 +950,10 @@
                         <div class="detail-value">
                             <div class="dob-container">
                                 <span id="dob-primary">${dob}</span>
-                                <button class="edit-btn" onclick="editDob(${booking.id}, null, '${booking.dob}')">Edit</button>
+                                ${isEditable ?
+                                    `<button class="edit-btn" onclick="editDob(${booking.id}, null, '${booking.dob}')">Edit</button>` :
+                                    '<span style="color: #999; font-size: 0.85em;">(Not editable)</span>'
+                                }
                             </div>
                         </div>
                     </div>
@@ -935,7 +966,10 @@
                         <div class="detail-value">
                             <div class="govt-id-container">
                                 <span id="govtId-primary">${booking.govt_id_number}</span>
-                                <button class="edit-btn" onclick="editGovtId(${booking.id}, null, '${booking.govt_id_number}')">Edit</button>
+                                ${isEditable ?
+                                    `<button class="edit-btn" onclick="editGovtId(${booking.id}, null, '${booking.govt_id_number}')">Edit</button>` :
+                                    '<span style="color: #999; font-size: 0.85em;">(Not editable)</span>'
+                                }
                             </div>
                         </div>
                     </div>
@@ -1017,7 +1051,10 @@
                                 <div class="detail-value">
                                     <div class="dob-container">
                                         <span id="dob-${index}">${guestDob}</span>
-                                        <button class="edit-btn" onclick="editDob(${booking.id}, ${index}, '${guest.dob}')">Edit</button>
+                                        ${isEditable ?
+                                            `<button class="edit-btn" onclick="editDob(${booking.id}, ${index}, '${guest.dob}')">Edit</button>` :
+                                            '<span style="color: #999; font-size: 0.85em;">(Not editable)</span>'
+                                        }
                                     </div>
                                 </div>
                             </div>
@@ -1030,7 +1067,10 @@
                                 <div class="detail-value">
                                     <div class="govt-id-container">
                                         <span id="govtId-${index}">${guest.govtIdNumber}</span>
-                                        <button class="edit-btn" onclick="editGovtId(${booking.id}, ${index}, '${guest.govtIdNumber}')">Edit</button>
+                                        ${isEditable ?
+                                            `<button class="edit-btn" onclick="editGovtId(${booking.id}, ${index}, '${guest.govtIdNumber}')">Edit</button>` :
+                                            '<span style="color: #999; font-size: 0.85em;">(Not editable)</span>'
+                                        }
                                     </div>
                                 </div>
                             </div>
