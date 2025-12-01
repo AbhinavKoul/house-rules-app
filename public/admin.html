@@ -47,6 +47,11 @@
             font-weight: bold;
         }
 
+        .status-completed {
+            color: #007bff;
+            font-weight: bold;
+        }
+
         .status-cancelled {
             color: #dc3545;
             font-weight: bold;
@@ -513,6 +518,7 @@
                     <select id="statusFilter" class="filter-input" onchange="filterBookings()">
                         <option value="all">All Bookings</option>
                         <option value="active" selected>Active Only</option>
+                        <option value="completed">Completed Only</option>
                         <option value="cancelled">Cancelled Only</option>
                     </select>
                 </div>
@@ -543,6 +549,24 @@
     <script>
         let hostKey = '';
         let allBookings = [];
+
+        // Helper function to compute booking status
+        function getBookingStatus(booking) {
+            if (booking.cancelled) {
+                return 'cancelled';
+            }
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const checkOutDate = new Date(booking.check_out_date);
+            checkOutDate.setHours(0, 0, 0, 0);
+
+            if (checkOutDate < today) {
+                return 'completed';
+            }
+
+            return 'active';
+        }
 
         async function loadBookings() {
             hostKey = document.getElementById('hostKey').value.trim();
@@ -585,22 +609,26 @@
                 // Find and display upcoming booking
                 displayUpcomingBooking(bookings);
 
-                // Sort by check-in date (upcoming first, then past bookings)
+                // Sort by status and check-in date (active first, then completed, then cancelled)
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
 
                 bookings.sort((a, b) => {
+                    const statusA = getBookingStatus(a);
+                    const statusB = getBookingStatus(b);
                     const dateA = new Date(a.check_in_date);
                     const dateB = new Date(b.check_in_date);
-                    const isAUpcoming = dateA >= today && !a.cancelled;
-                    const isBUpcoming = dateB >= today && !b.cancelled;
 
-                    // Upcoming bookings first
-                    if (isAUpcoming && !isBUpcoming) return -1;
-                    if (!isAUpcoming && isBUpcoming) return 1;
+                    // Active bookings first
+                    if (statusA === 'active' && statusB !== 'active') return -1;
+                    if (statusA !== 'active' && statusB === 'active') return 1;
 
-                    // Within same category, sort by date
-                    if (isAUpcoming && isBUpcoming) return dateA - dateB; // Earlier upcoming first
+                    // Completed bookings second
+                    if (statusA === 'completed' && statusB === 'cancelled') return -1;
+                    if (statusA === 'cancelled' && statusB === 'completed') return 1;
+
+                    // Within same status, sort by date
+                    if (statusA === 'active') return dateA - dateB; // Earlier upcoming first
                     return dateB - dateA; // Latest past booking first
                 });
 
@@ -625,11 +653,24 @@
                     const checkIn = new Date(booking.check_in_date).toLocaleDateString();
                     const checkOut = new Date(booking.check_out_date).toLocaleDateString();
                     const totalGuests = booking.number_of_guests + (booking.number_of_children || 0);
-                    const status = booking.cancelled ? 'Cancelled' : 'Active';
-                    const statusClass = booking.cancelled ? 'status-cancelled' : 'status-active';
+
+                    // Compute status based on dates and cancellation
+                    const bookingStatus = getBookingStatus(booking);
+                    let status, statusClass;
+
+                    if (bookingStatus === 'cancelled') {
+                        status = 'Cancelled';
+                        statusClass = 'status-cancelled';
+                    } else if (bookingStatus === 'completed') {
+                        status = 'Completed';
+                        statusClass = 'status-completed';
+                    } else {
+                        status = 'Active';
+                        statusClass = 'status-active';
+                    }
 
                     html += `
-                        <tr data-booking-id="${booking.id}">
+                        <tr data-booking-id="${booking.id}" data-status="${bookingStatus}">
                             <td>${booking.id}</td>
                             <td>${booking.name}</td>
                             <td>${booking.email}</td>
@@ -639,9 +680,9 @@
                             <td class="${statusClass}">${status}</td>
                             <td>
                                 <button class="view-btn" onclick="viewBookingDetails(${booking.id})">View</button>
-                                ${!booking.cancelled ?
+                                ${bookingStatus === 'active' ?
                                     `<button class="cancel-btn" onclick="cancelBooking(${booking.id})">Cancel</button>` :
-                                    '<span style="color: #999;">Cancelled</span>'
+                                    `<span style="color: #999;">${status}</span>`
                                 }
                             </td>
                         </tr>
@@ -717,9 +758,12 @@
             const today = new Date();
             today.setHours(0, 0, 0, 0);
 
-            // Find the next upcoming active booking
+            // Find the next upcoming active booking (not cancelled or completed)
             const upcomingBooking = bookings
-                .filter(b => !b.cancelled && new Date(b.check_in_date) >= today)
+                .filter(b => {
+                    const bookingStatus = getBookingStatus(b);
+                    return bookingStatus === 'active' && new Date(b.check_in_date) >= today;
+                })
                 .sort((a, b) => new Date(a.check_in_date) - new Date(b.check_in_date))[0];
 
             const upcomingSection = document.getElementById('upcomingBooking');
@@ -782,7 +826,7 @@
                 const name = row.cells[1].textContent.toLowerCase();
                 const email = row.cells[2].textContent.toLowerCase();
                 const checkInDate = row.cells[3].textContent;
-                const status = row.cells[6].textContent.toLowerCase();
+                const rowStatus = row.getAttribute('data-status');
 
                 // Search filter - includes primary guest and additional guests
                 let matchesSearch = name.includes(searchInput) || email.includes(searchInput);
@@ -803,9 +847,11 @@
                 // Status filter
                 let matchesStatus = true;
                 if (statusFilter === 'active') {
-                    matchesStatus = status === 'active';
+                    matchesStatus = rowStatus === 'active';
+                } else if (statusFilter === 'completed') {
+                    matchesStatus = rowStatus === 'completed';
                 } else if (statusFilter === 'cancelled') {
-                    matchesStatus = status === 'cancelled';
+                    matchesStatus = rowStatus === 'cancelled';
                 }
 
                 // Date range filter
@@ -925,8 +971,16 @@
                     ` : ''}
                     <div class="detail-row">
                         <div class="detail-label">Status:</div>
-                        <div class="detail-value ${booking.cancelled ? 'status-cancelled' : 'status-active'}">
-                            ${booking.cancelled ? 'Cancelled' : 'Active'}
+                        <div class="detail-value ${
+                            booking.cancelled ? 'status-cancelled' :
+                            getBookingStatus(booking) === 'completed' ? 'status-completed' :
+                            'status-active'
+                        }">
+                            ${
+                                booking.cancelled ? 'Cancelled' :
+                                getBookingStatus(booking) === 'completed' ? 'Completed' :
+                                'Active'
+                            }
                         </div>
                     </div>
                     <div class="detail-row">
