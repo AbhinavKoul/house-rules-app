@@ -342,6 +342,20 @@
             gap: 10px;
         }
 
+        .dob-input {
+            padding: 6px;
+            border: 2px solid #667eea;
+            border-radius: 4px;
+            font-size: 0.95em;
+            width: 200px;
+        }
+
+        .dob-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
         /* Mobile Responsiveness for Admin */
         @media (max-width: 768px) {
             .admin-container {
@@ -859,7 +873,12 @@
                     </div>
                     <div class="detail-row">
                         <div class="detail-label">Date of Birth:</div>
-                        <div class="detail-value">${dob}</div>
+                        <div class="detail-value">
+                            <div class="dob-container">
+                                <span id="dob-primary">${dob}</span>
+                                <button class="edit-btn" onclick="editDob(${booking.id}, null, '${booking.dob}')">Edit</button>
+                            </div>
+                        </div>
                     </div>
                     <div class="detail-row">
                         <div class="detail-label">Government ID Type:</div>
@@ -941,7 +960,12 @@
                             </div>
                             <div class="detail-row">
                                 <div class="detail-label">Date of Birth:</div>
-                                <div class="detail-value">${guestDob}</div>
+                                <div class="detail-value">
+                                    <div class="dob-container">
+                                        <span id="dob-${index}">${guestDob}</span>
+                                        <button class="edit-btn" onclick="editDob(${booking.id}, ${index}, '${guest.dob}')">Edit</button>
+                                    </div>
+                                </div>
                             </div>
                             <div class="detail-row">
                                 <div class="detail-label">Government ID Type:</div>
@@ -1070,6 +1094,134 @@
             container.innerHTML = `
                 <span id="${elementId}">${originalValue}</span>
                 <button class="edit-btn" onclick="editGovtId(${bookingId}, ${guestIndex}, '${originalValue}')">Edit</button>
+            `;
+        }
+
+        // Edit date of birth functionality
+        function editDob(bookingId, guestIndex, currentValue) {
+            const elementId = guestIndex === null ? 'dob-primary' : `dob-${guestIndex}`;
+            const container = document.getElementById(elementId).parentElement;
+
+            // Calculate max date (18 years ago)
+            const maxDate = new Date();
+            maxDate.setFullYear(maxDate.getFullYear() - 18);
+            const maxDateString = maxDate.toISOString().split('T')[0];
+
+            // Replace content with input and buttons
+            container.innerHTML = `
+                <input type="date" id="input-${elementId}" class="dob-input" value="${currentValue}" max="${maxDateString}" />
+                <button class="save-btn" onclick="saveDob(${bookingId}, ${guestIndex}, '${elementId}', '${currentValue}')">Save</button>
+                <button class="cancel-edit-btn" onclick="cancelEditDob('${elementId}', '${currentValue}')">Cancel</button>
+            `;
+
+            // Focus on input
+            document.getElementById(`input-${elementId}`).focus();
+        }
+
+        async function saveDob(bookingId, guestIndex, elementId, originalValue) {
+            const inputElement = document.getElementById(`input-${elementId}`);
+            const newValue = inputElement.value.trim();
+
+            if (!newValue) {
+                showMessage('Date of birth cannot be empty', 'error');
+                return;
+            }
+
+            // Validate age
+            const birthDate = new Date(newValue);
+            const today = new Date();
+            let age = today.getFullYear() - birthDate.getFullYear();
+            const monthDiff = today.getMonth() - birthDate.getMonth();
+
+            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+                age--;
+            }
+
+            if (age < 18 || birthDate >= today) {
+                showMessage('Guest must be at least 18 years old', 'error');
+                return;
+            }
+
+            if (newValue === originalValue) {
+                showMessage('No changes made', 'info');
+                cancelEditDob(elementId, originalValue);
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/update-dob', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        bookingId: bookingId,
+                        guestIndex: guestIndex,
+                        dob: newValue,
+                        hostKey: hostKey
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showMessage(result.message, 'success');
+
+                    // Format the date for display
+                    const formattedDate = new Date(newValue).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    });
+
+                    // Update the display with new value
+                    const container = document.getElementById(`input-${elementId}`).parentElement;
+                    container.innerHTML = `
+                        <span id="${elementId}">${formattedDate}</span>
+                        <button class="edit-btn" onclick="editDob(${bookingId}, ${guestIndex}, '${newValue}')">Edit</button>
+                    `;
+
+                    // Update the local booking data
+                    const booking = allBookings.find(b => b.id === bookingId);
+                    if (booking) {
+                        if (guestIndex === null) {
+                            booking.dob = newValue;
+                        } else {
+                            booking.additional_guests[guestIndex].dob = newValue;
+                        }
+                    }
+                } else {
+                    showMessage(result.error || 'Failed to update date of birth', 'error');
+                }
+            } catch (error) {
+                console.error('Error updating date of birth:', error);
+                showMessage('Network error. Please try again.', 'error');
+            }
+        }
+
+        function cancelEditDob(elementId, originalValue) {
+            const bookingId = allBookings.find(b => {
+                if (elementId === 'dob-primary') {
+                    return b.dob === originalValue;
+                } else {
+                    const index = parseInt(elementId.split('-')[1]);
+                    return b.additional_guests && b.additional_guests[index] && b.additional_guests[index].dob === originalValue;
+                }
+            })?.id;
+
+            const guestIndex = elementId === 'dob-primary' ? null : parseInt(elementId.split('-')[1]);
+
+            // Format the date for display
+            const formattedDate = new Date(originalValue).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+
+            const container = document.getElementById(`input-${elementId}`).parentElement;
+            container.innerHTML = `
+                <span id="${elementId}">${formattedDate}</span>
+                <button class="edit-btn" onclick="editDob(${bookingId}, ${guestIndex}, '${originalValue}')">Edit</button>
             `;
         }
     </script>

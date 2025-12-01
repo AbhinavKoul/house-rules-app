@@ -375,6 +375,87 @@ app.post('/api/update-govt-id', async (req, res) => {
   }
 });
 
+// Update date of birth
+app.post('/api/update-dob', async (req, res) => {
+  const { bookingId, guestIndex, dob, hostKey } = req.body;
+
+  // Validate host key
+  if (!hostKey || hostKey !== process.env.HOST_KEY) {
+    return res.status(403).json({ error: 'Unauthorized: Invalid or missing host key' });
+  }
+
+  if (!bookingId || !dob) {
+    return res.status(400).json({ error: 'Booking ID and date of birth are required' });
+  }
+
+  // Validate age (must be at least 18 years old)
+  const birthDate = new Date(dob);
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+
+  if (age < 18 || birthDate >= today) {
+    return res.status(400).json({ error: 'Guest must be at least 18 years old' });
+  }
+
+  try {
+    // If guestIndex is null or undefined, update primary guest
+    if (guestIndex === null || guestIndex === undefined) {
+      const result = await pool.query(
+        'UPDATE acknowledgments SET dob = $1 WHERE id = $2 RETURNING id, name, dob',
+        [dob, bookingId]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Booking not found' });
+      }
+
+      res.json({
+        success: true,
+        message: 'Date of birth updated successfully',
+        data: result.rows[0]
+      });
+    } else {
+      // Update additional guest's date of birth
+      const bookingResult = await pool.query(
+        'SELECT additional_guests FROM acknowledgments WHERE id = $1',
+        [bookingId]
+      );
+
+      if (bookingResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Booking not found' });
+      }
+
+      const additionalGuests = bookingResult.rows[0].additional_guests || [];
+
+      if (guestIndex < 0 || guestIndex >= additionalGuests.length) {
+        return res.status(400).json({ error: 'Invalid guest index' });
+      }
+
+      // Update the specific guest's DOB
+      additionalGuests[guestIndex].dob = dob;
+
+      const result = await pool.query(
+        'UPDATE acknowledgments SET additional_guests = $1 WHERE id = $2 RETURNING id, additional_guests',
+        [JSON.stringify(additionalGuests), bookingId]
+      );
+
+      res.json({
+        success: true,
+        message: 'Date of birth updated successfully',
+        data: result.rows[0]
+      });
+    }
+  } catch (err) {
+    console.error('Database error:', err);
+    res.status(500).json({ error: 'Failed to update date of birth' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
