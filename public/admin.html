@@ -283,6 +283,65 @@
             margin-bottom: 10px;
         }
 
+        .edit-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 4px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85em;
+            margin-left: 10px;
+        }
+
+        .edit-btn:hover {
+            background: #218838;
+        }
+
+        .save-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 4px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85em;
+            margin-left: 10px;
+        }
+
+        .save-btn:hover {
+            background: #0056b3;
+        }
+
+        .cancel-edit-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 4px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85em;
+            margin-left: 5px;
+        }
+
+        .cancel-edit-btn:hover {
+            background: #5a6268;
+        }
+
+        .govt-id-input {
+            padding: 6px;
+            border: 2px solid #667eea;
+            border-radius: 4px;
+            font-size: 0.95em;
+            width: 250px;
+        }
+
+        .govt-id-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
         /* Mobile Responsiveness for Admin */
         @media (max-width: 768px) {
             .admin-container {
@@ -808,7 +867,12 @@
                     </div>
                     <div class="detail-row">
                         <div class="detail-label">Government ID Number:</div>
-                        <div class="detail-value">${booking.govt_id_number}</div>
+                        <div class="detail-value">
+                            <div class="govt-id-container">
+                                <span id="govtId-primary">${booking.govt_id_number}</span>
+                                <button class="edit-btn" onclick="editGovtId(${booking.id}, null, '${booking.govt_id_number}')">Edit</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -885,7 +949,12 @@
                             </div>
                             <div class="detail-row">
                                 <div class="detail-label">Government ID Number:</div>
-                                <div class="detail-value">${guest.govtIdNumber}</div>
+                                <div class="detail-value">
+                                    <div class="govt-id-container">
+                                        <span id="govtId-${index}">${guest.govtIdNumber}</span>
+                                        <button class="edit-btn" onclick="editGovtId(${booking.id}, ${index}, '${guest.govtIdNumber}')">Edit</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     `;
@@ -908,6 +977,100 @@
             if (event.target == modal) {
                 closeModal();
             }
+        }
+
+        // Edit government ID functionality
+        function editGovtId(bookingId, guestIndex, currentValue) {
+            const elementId = guestIndex === null ? 'govtId-primary' : `govtId-${guestIndex}`;
+            const container = document.getElementById(elementId).parentElement;
+
+            // Replace content with input and buttons
+            container.innerHTML = `
+                <input type="text" id="input-${elementId}" class="govt-id-input" value="${currentValue}" />
+                <button class="save-btn" onclick="saveGovtId(${bookingId}, ${guestIndex}, '${elementId}', '${currentValue}')">Save</button>
+                <button class="cancel-edit-btn" onclick="cancelEditGovtId('${elementId}', '${currentValue}')">Cancel</button>
+            `;
+
+            // Focus on input
+            document.getElementById(`input-${elementId}`).focus();
+        }
+
+        async function saveGovtId(bookingId, guestIndex, elementId, originalValue) {
+            const inputElement = document.getElementById(`input-${elementId}`);
+            const newValue = inputElement.value.trim();
+
+            if (!newValue) {
+                showMessage('Government ID number cannot be empty', 'error');
+                return;
+            }
+
+            if (newValue === originalValue) {
+                showMessage('No changes made', 'info');
+                cancelEditGovtId(elementId, originalValue);
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/update-govt-id', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        bookingId: bookingId,
+                        guestIndex: guestIndex,
+                        govtIdNumber: newValue,
+                        hostKey: hostKey
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showMessage(result.message, 'success');
+
+                    // Update the display with new value
+                    const container = document.getElementById(`input-${elementId}`).parentElement;
+                    container.innerHTML = `
+                        <span id="${elementId}">${newValue}</span>
+                        <button class="edit-btn" onclick="editGovtId(${bookingId}, ${guestIndex}, '${newValue}')">Edit</button>
+                    `;
+
+                    // Update the local booking data
+                    const booking = allBookings.find(b => b.id === bookingId);
+                    if (booking) {
+                        if (guestIndex === null) {
+                            booking.govt_id_number = newValue;
+                        } else {
+                            booking.additional_guests[guestIndex].govtIdNumber = newValue;
+                        }
+                    }
+                } else {
+                    showMessage(result.error || 'Failed to update government ID', 'error');
+                }
+            } catch (error) {
+                console.error('Error updating government ID:', error);
+                showMessage('Network error. Please try again.', 'error');
+            }
+        }
+
+        function cancelEditGovtId(elementId, originalValue) {
+            const bookingId = allBookings.find(b => {
+                if (elementId === 'govtId-primary') {
+                    return b.govt_id_number === originalValue;
+                } else {
+                    const index = parseInt(elementId.split('-')[1]);
+                    return b.additional_guests && b.additional_guests[index] && b.additional_guests[index].govtIdNumber === originalValue;
+                }
+            })?.id;
+
+            const guestIndex = elementId === 'govtId-primary' ? null : parseInt(elementId.split('-')[1]);
+
+            const container = document.getElementById(`input-${elementId}`).parentElement;
+            container.innerHTML = `
+                <span id="${elementId}">${originalValue}</span>
+                <button class="edit-btn" onclick="editGovtId(${bookingId}, ${guestIndex}, '${originalValue}')">Edit</button>
+            `;
         }
     </script>
 </body>
