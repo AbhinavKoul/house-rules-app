@@ -979,11 +979,27 @@
                     <h3>Booking Information</h3>
                     <div class="detail-row">
                         <div class="detail-label">Check-In Date:</div>
-                        <div class="detail-value">${checkIn}</div>
+                        <div class="detail-value">
+                            <div class="checkin-date-container">
+                                <span id="checkIn-${booking.id}">${checkIn}</span>
+                                ${getBookingStatus(booking) === 'active' ?
+                                    `<button class="edit-btn" onclick="editCheckInDate(${booking.id}, '${booking.check_in_date}')">Edit</button>` :
+                                    ''
+                                }
+                            </div>
+                        </div>
                     </div>
                     <div class="detail-row">
                         <div class="detail-label">Check-Out Date:</div>
-                        <div class="detail-value">${checkOut}</div>
+                        <div class="detail-value">
+                            <div class="checkout-date-container">
+                                <span id="checkOut-${booking.id}">${checkOut}</span>
+                                ${getBookingStatus(booking) === 'active' ?
+                                    `<button class="edit-btn" onclick="editCheckOutDate(${booking.id}, '${booking.check_out_date}')">Edit</button>` :
+                                    ''
+                                }
+                            </div>
+                        </div>
                     </div>
                     <div class="detail-row">
                         <div class="detail-label">Number of Adults:</div>
@@ -1291,6 +1307,205 @@
                 console.error('Error updating date of birth:', error);
                 showMessage('Network error. Please try again.', 'error');
             }
+        }
+
+        // Edit check-in date functionality
+        function editCheckInDate(bookingId, currentValue) {
+            const elementId = `checkIn-${bookingId}`;
+            const container = document.getElementById(elementId).parentElement;
+
+            // Min date is today
+            const today = new Date();
+            const minDateString = today.toISOString().split('T')[0];
+
+            container.innerHTML = `
+                <input type="date" id="input-${elementId}" class="checkin-date-input" value="${currentValue}" min="${minDateString}" />
+                <button class="save-btn" onclick="saveCheckInDate(${bookingId}, '${elementId}', '${currentValue}')">Save</button>
+                <button class="cancel-edit-btn" onclick="cancelEditCheckInDate(${bookingId}, '${elementId}', '${currentValue}')">Cancel</button>
+            `;
+
+            document.getElementById(`input-${elementId}`).focus();
+        }
+
+        async function saveCheckInDate(bookingId, elementId, originalValue) {
+            const inputElement = document.getElementById(`input-${elementId}`);
+            const newValue = inputElement.value.trim();
+
+            if (!newValue) {
+                showMessage('Check-in date cannot be empty', 'error');
+                return;
+            }
+
+            // Validate not in the past
+            const newDate = new Date(newValue);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            if (newDate < today) {
+                showMessage('Check-in date cannot be in the past', 'error');
+                return;
+            }
+
+            if (newValue === originalValue) {
+                showMessage('No changes made', 'info');
+                cancelEditCheckInDate(bookingId, elementId, originalValue);
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/update-check-in-date', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        bookingId: bookingId,
+                        checkInDate: newValue,
+                        hostKey: hostKey
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showMessage(result.message, 'success');
+
+                    const formattedDate = new Date(newValue).toLocaleDateString('en-US', {
+                        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+                    });
+
+                    const container = document.getElementById(`input-${elementId}`).parentElement;
+                    container.innerHTML = `
+                        <span id="${elementId}">${formattedDate}</span>
+                        <button class="edit-btn" onclick="editCheckInDate(${bookingId}, '${newValue}')">Edit</button>
+                    `;
+
+                    // Update local booking data
+                    const booking = allBookings.find(b => b.id === bookingId);
+                    if (booking) {
+                        booking.check_in_date = newValue;
+                    }
+
+                    // Refresh table to show updated dates
+                    loadBookings();
+                } else {
+                    showMessage(result.error || 'Failed to update check-in date', 'error');
+                }
+            } catch (error) {
+                console.error('Error updating check-in date:', error);
+                showMessage('Network error. Please try again.', 'error');
+            }
+        }
+
+        function cancelEditCheckInDate(bookingId, elementId, originalValue) {
+            const formattedDate = new Date(originalValue).toLocaleDateString('en-US', {
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+            });
+
+            const container = document.getElementById(`input-${elementId}`).parentElement;
+            container.innerHTML = `
+                <span id="${elementId}">${formattedDate}</span>
+                <button class="edit-btn" onclick="editCheckInDate(${bookingId}, '${originalValue}')">Edit</button>
+            `;
+        }
+
+        // Edit check-out date functionality
+        function editCheckOutDate(bookingId, currentValue) {
+            const elementId = `checkOut-${bookingId}`;
+            const container = document.getElementById(elementId).parentElement;
+
+            // Min date is day after check-in
+            const booking = allBookings.find(b => b.id === bookingId);
+            const checkInDate = new Date(booking.check_in_date);
+            checkInDate.setDate(checkInDate.getDate() + 1);
+            const minDateString = checkInDate.toISOString().split('T')[0];
+
+            container.innerHTML = `
+                <input type="date" id="input-${elementId}" class="checkout-date-input" value="${currentValue}" min="${minDateString}" />
+                <button class="save-btn" onclick="saveCheckOutDate(${bookingId}, '${elementId}', '${currentValue}')">Save</button>
+                <button class="cancel-edit-btn" onclick="cancelEditCheckOutDate(${bookingId}, '${elementId}', '${currentValue}')">Cancel</button>
+            `;
+
+            document.getElementById(`input-${elementId}`).focus();
+        }
+
+        async function saveCheckOutDate(bookingId, elementId, originalValue) {
+            const inputElement = document.getElementById(`input-${elementId}`);
+            const newValue = inputElement.value.trim();
+
+            if (!newValue) {
+                showMessage('Check-out date cannot be empty', 'error');
+                return;
+            }
+
+            // Validate check-out is after check-in
+            const booking = allBookings.find(b => b.id === bookingId);
+            const checkInDate = new Date(booking.check_in_date);
+            const newCheckOut = new Date(newValue);
+            if (newCheckOut <= checkInDate) {
+                showMessage('Check-out date must be after check-in date', 'error');
+                return;
+            }
+
+            if (newValue === originalValue) {
+                showMessage('No changes made', 'info');
+                cancelEditCheckOutDate(bookingId, elementId, originalValue);
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/update-check-out-date', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        bookingId: bookingId,
+                        checkOutDate: newValue,
+                        hostKey: hostKey
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showMessage(result.message, 'success');
+
+                    const formattedDate = new Date(newValue).toLocaleDateString('en-US', {
+                        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+                    });
+
+                    const container = document.getElementById(`input-${elementId}`).parentElement;
+                    container.innerHTML = `
+                        <span id="${elementId}">${formattedDate}</span>
+                        <button class="edit-btn" onclick="editCheckOutDate(${bookingId}, '${newValue}')">Edit</button>
+                    `;
+
+                    // Update local booking data
+                    if (booking) {
+                        booking.check_out_date = newValue;
+                    }
+
+                    // Refresh table to show updated dates
+                    loadBookings();
+                } else {
+                    showMessage(result.error || 'Failed to update check-out date', 'error');
+                }
+            } catch (error) {
+                console.error('Error updating check-out date:', error);
+                showMessage('Network error. Please try again.', 'error');
+            }
+        }
+
+        function cancelEditCheckOutDate(bookingId, elementId, originalValue) {
+            const formattedDate = new Date(originalValue).toLocaleDateString('en-US', {
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+            });
+
+            const container = document.getElementById(`input-${elementId}`).parentElement;
+            container.innerHTML = `
+                <span id="${elementId}">${formattedDate}</span>
+                <button class="edit-btn" onclick="editCheckOutDate(${bookingId}, '${originalValue}')">Edit</button>
+            `;
         }
 
         function cancelEditDob(elementId, originalValue) {

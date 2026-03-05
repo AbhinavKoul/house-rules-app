@@ -456,6 +456,167 @@ app.post('/api/update-dob', async (req, res) => {
   }
 });
 
+// Update check-in date
+app.post('/api/update-check-in-date', async (req, res) => {
+  const { bookingId, checkInDate, hostKey } = req.body;
+
+  if (!hostKey || hostKey !== process.env.HOST_KEY) {
+    return res.status(403).json({ error: 'Unauthorized: Invalid or missing host key' });
+  }
+
+  if (!bookingId || !checkInDate) {
+    return res.status(400).json({ error: 'Booking ID and check-in date are required' });
+  }
+
+  // Validate check-in date is not in the past
+  const newCheckIn = new Date(checkInDate);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (newCheckIn < today) {
+    return res.status(400).json({ error: 'Check-in date cannot be in the past' });
+  }
+
+  try {
+    // Fetch the booking
+    const bookingResult = await pool.query(
+      'SELECT id, check_in_date, check_out_date, cancelled FROM acknowledgments WHERE id = $1',
+      [bookingId]
+    );
+
+    if (bookingResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    const booking = bookingResult.rows[0];
+
+    if (booking.cancelled) {
+      return res.status(400).json({ error: 'Cannot edit a cancelled booking' });
+    }
+
+    // Check booking is still active (checkout >= today)
+    const checkOutDate = new Date(booking.check_out_date);
+    checkOutDate.setHours(0, 0, 0, 0);
+    if (checkOutDate < today) {
+      return res.status(400).json({ error: 'Cannot edit dates for a completed booking' });
+    }
+
+    // Validate new check-in is before existing check-out
+    if (newCheckIn >= checkOutDate) {
+      return res.status(400).json({ error: 'Check-in date must be before check-out date' });
+    }
+
+    // Check for overlapping bookings (excluding this one)
+    const overlapQuery = `
+      SELECT id FROM acknowledgments
+      WHERE cancelled = FALSE AND id != $3
+      AND (
+        (check_in_date <= $1 AND check_out_date > $1) OR
+        (check_in_date < $2 AND check_out_date >= $2) OR
+        (check_in_date >= $1 AND check_out_date <= $2)
+      )
+    `;
+    const overlapResult = await pool.query(overlapQuery, [checkInDate, booking.check_out_date, bookingId]);
+
+    if (overlapResult.rows.length > 0) {
+      return res.status(409).json({ error: 'These dates overlap with an existing booking. Please select different dates.' });
+    }
+
+    const result = await pool.query(
+      'UPDATE acknowledgments SET check_in_date = $1 WHERE id = $2 RETURNING id, check_in_date, check_out_date',
+      [checkInDate, bookingId]
+    );
+
+    res.json({
+      success: true,
+      message: 'Check-in date updated successfully',
+      data: result.rows[0]
+    });
+  } catch (err) {
+    console.error('Database error:', err);
+    res.status(500).json({ error: 'Failed to update check-in date' });
+  }
+});
+
+// Update check-out date
+app.post('/api/update-check-out-date', async (req, res) => {
+  const { bookingId, checkOutDate, hostKey } = req.body;
+
+  if (!hostKey || hostKey !== process.env.HOST_KEY) {
+    return res.status(403).json({ error: 'Unauthorized: Invalid or missing host key' });
+  }
+
+  if (!bookingId || !checkOutDate) {
+    return res.status(400).json({ error: 'Booking ID and check-out date are required' });
+  }
+
+  try {
+    // Fetch the booking
+    const bookingResult = await pool.query(
+      'SELECT id, check_in_date, check_out_date, cancelled FROM acknowledgments WHERE id = $1',
+      [bookingId]
+    );
+
+    if (bookingResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    const booking = bookingResult.rows[0];
+
+    if (booking.cancelled) {
+      return res.status(400).json({ error: 'Cannot edit a cancelled booking' });
+    }
+
+    // Check booking is still active (current checkout >= today)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const currentCheckOut = new Date(booking.check_out_date);
+    currentCheckOut.setHours(0, 0, 0, 0);
+    if (currentCheckOut < today) {
+      return res.status(400).json({ error: 'Cannot edit dates for a completed booking' });
+    }
+
+    // Validate new check-out is after existing check-in
+    const checkInDate = new Date(booking.check_in_date);
+    checkInDate.setHours(0, 0, 0, 0);
+    const newCheckOut = new Date(checkOutDate);
+
+    if (newCheckOut <= checkInDate) {
+      return res.status(400).json({ error: 'Check-out date must be after check-in date' });
+    }
+
+    // Check for overlapping bookings (excluding this one)
+    const overlapQuery = `
+      SELECT id FROM acknowledgments
+      WHERE cancelled = FALSE AND id != $3
+      AND (
+        (check_in_date <= $1 AND check_out_date > $1) OR
+        (check_in_date < $2 AND check_out_date >= $2) OR
+        (check_in_date >= $1 AND check_out_date <= $2)
+      )
+    `;
+    const overlapResult = await pool.query(overlapQuery, [booking.check_in_date, checkOutDate, bookingId]);
+
+    if (overlapResult.rows.length > 0) {
+      return res.status(409).json({ error: 'These dates overlap with an existing booking. Please select different dates.' });
+    }
+
+    const result = await pool.query(
+      'UPDATE acknowledgments SET check_out_date = $1 WHERE id = $2 RETURNING id, check_in_date, check_out_date',
+      [checkOutDate, bookingId]
+    );
+
+    res.json({
+      success: true,
+      message: 'Check-out date updated successfully',
+      data: result.rows[0]
+    });
+  } catch (err) {
+    console.error('Database error:', err);
+    res.status(500).json({ error: 'Failed to update check-out date' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
