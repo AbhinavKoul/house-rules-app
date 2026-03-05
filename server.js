@@ -81,6 +81,21 @@ const initDB = async () => {
       EXCEPTION
         WHEN duplicate_column THEN NULL;
       END;
+      BEGIN
+        ALTER TABLE acknowledgments ADD COLUMN emergency_contact_name VARCHAR(255);
+      EXCEPTION
+        WHEN duplicate_column THEN NULL;
+      END;
+      BEGIN
+        ALTER TABLE acknowledgments ADD COLUMN emergency_contact_phone VARCHAR(20);
+      EXCEPTION
+        WHEN duplicate_column THEN NULL;
+      END;
+      BEGIN
+        ALTER TABLE acknowledgments ADD COLUMN emergency_contact_relationship VARCHAR(50);
+      EXCEPTION
+        WHEN duplicate_column THEN NULL;
+      END;
     END $$;
   `;
 
@@ -121,11 +136,27 @@ app.get('/', (req, res) => {
 
 // Submit acknowledgment
 app.post('/api/acknowledge', async (req, res) => {
-  const { name, email, dob, govtIdType, govtIdNumber, numberOfGuests, numberOfChildren, relationshipType, additionalGuests, checkInDate, checkOutDate } = req.body;
+  const { name, email, dob, govtIdType, govtIdNumber, numberOfGuests, numberOfChildren, relationshipType, additionalGuests, checkInDate, checkOutDate, emergencyContactName, emergencyContactPhone, emergencyContactRelationship } = req.body;
 
   // Validation
   if (!name || !email || !dob || !govtIdType || !govtIdNumber || !numberOfGuests || !checkInDate || !checkOutDate) {
     return res.status(400).json({ error: 'All fields are required' });
+  }
+
+  // Validate emergency contact fields
+  if (!emergencyContactName || !emergencyContactPhone || !emergencyContactRelationship) {
+    return res.status(400).json({ error: 'Emergency contact details are required (name, phone, and relationship)' });
+  }
+
+  // Validate emergency contact phone format
+  const phoneClean = emergencyContactPhone.replace(/[\s\-]/g, '');
+  if (!/^\+?\d{7,15}$/.test(phoneClean)) {
+    return res.status(400).json({ error: 'Please enter a valid emergency contact phone number (7-15 digits)' });
+  }
+
+  const validRelationships = ['Spouse', 'Parent', 'Sibling', 'Child', 'Friend', 'Other'];
+  if (!validRelationships.includes(emergencyContactRelationship)) {
+    return res.status(400).json({ error: 'Please select a valid relationship type for emergency contact' });
   }
 
   // Validate dates
@@ -206,8 +237,8 @@ app.post('/api/acknowledge', async (req, res) => {
     }
 
     const query = `
-      INSERT INTO acknowledgments (name, email, dob, govt_id_type, govt_id_number, number_of_guests, number_of_children, relationship_type, additional_guests, check_in_date, check_out_date, ip_address)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      INSERT INTO acknowledgments (name, email, dob, govt_id_type, govt_id_number, number_of_guests, number_of_children, relationship_type, additional_guests, check_in_date, check_out_date, ip_address, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
       RETURNING id, acknowledged_at, check_in_date, check_out_date
     `;
 
@@ -223,7 +254,10 @@ app.post('/api/acknowledge', async (req, res) => {
       numGuests > 1 ? JSON.stringify(additionalGuests) : null,
       checkInDate,
       checkOutDate,
-      ipAddress
+      ipAddress,
+      emergencyContactName,
+      emergencyContactPhone,
+      emergencyContactRelationship
     ]);
 
     res.json({
@@ -251,7 +285,7 @@ app.get('/api/acknowledgments', async (req, res) => {
 
   try {
     const result = await pool.query(
-      'SELECT id, name, email, dob, govt_id_type, govt_id_number, number_of_guests, number_of_children, relationship_type, additional_guests, check_in_date, check_out_date, cancelled, acknowledged_at, ip_address FROM acknowledgments ORDER BY check_in_date DESC'
+      'SELECT id, name, email, dob, govt_id_type, govt_id_number, number_of_guests, number_of_children, relationship_type, additional_guests, check_in_date, check_out_date, cancelled, acknowledged_at, ip_address, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship FROM acknowledgments ORDER BY check_in_date DESC'
     );
     res.json(result.rows);
   } catch (err) {

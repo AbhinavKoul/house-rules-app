@@ -95,6 +95,7 @@ header p {
 
 .form-group input[type="text"],
 .form-group input[type="email"],
+.form-group input[type="tel"],
 .form-group input[type="date"],
 .form-group input[type="number"],
 .form-group select {
@@ -207,6 +208,7 @@ header p {
     color: #856404;
 }
 
+.emergency-contact-section,
 .additional-guest-section {
     margin: 25px 0;
     padding: 20px;
@@ -215,6 +217,7 @@ header p {
     border-radius: 8px;
 }
 
+.emergency-contact-section h3,
 .additional-guest-section h3 {
     color: #667eea;
     margin-bottom: 15px;
@@ -271,6 +274,7 @@ header p {
 
     .form-group input[type="text"],
     .form-group input[type="email"],
+    .form-group input[type="tel"],
     .form-group input[type="date"],
     .form-group input[type="number"],
     .form-group select {
@@ -291,11 +295,13 @@ header p {
         font-size: 1em;
     }
 
+    .emergency-contact-section,
     .additional-guest-section {
         padding: 15px;
         margin: 15px 0;
     }
 
+    .emergency-contact-section h3,
     .additional-guest-section h3 {
         font-size: 1.15em;
     }

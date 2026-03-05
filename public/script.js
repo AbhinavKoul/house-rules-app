@@ -192,6 +192,9 @@ document.addEventListener('DOMContentLoaded', function() {
             numberOfGuests: numberOfGuests,
             numberOfChildren: numberOfChildren,
             relationshipType: totalPeople > 1 ? document.getElementById('relationshipType').value : null,
+            emergencyContactName: document.getElementById('emergencyContactName').value.trim(),
+            emergencyContactPhone: document.getElementById('emergencyContactPhone').value.trim(),
+            emergencyContactRelationship: document.getElementById('emergencyContactRelationship').value,
             checkInDate: document.getElementById('checkInDate').value,
             checkOutDate: document.getElementById('checkOutDate').value,
             additionalGuests: []
@@ -215,6 +218,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Convert map to array
             formData.additionalGuests = Object.values(guestDataMap);
+        }
+
+        // Validate emergency contact
+        if (!formData.emergencyContactName || !formData.emergencyContactPhone || !formData.emergencyContactRelationship) {
+            showMessage('Please fill in all emergency contact fields.', 'error');
+            return;
+        }
+
+        if (!validatePhone(formData.emergencyContactPhone)) {
+            showMessage('Please enter a valid emergency contact phone number (7-15 digits, may include + prefix).', 'error');
+            return;
         }
 
         // Validate check-in and check-out dates
@@ -358,6 +372,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         return age >= 18 && birthDate < today;
+    }
+
+    function validatePhone(phone) {
+        const cleaned = phone.replace(/[\s\-]/g, '');
+        return /^\+?\d{7,15}$/.test(cleaned);
     }
 
     function validateGovtId(type, number) {

@@ -57,6 +57,33 @@
                         <input type="text" id="govtIdNumber" name="govtIdNumber" required>
                     </div>
 
+                    <div class="emergency-contact-section">
+                        <h3>Emergency Contact</h3>
+
+                        <div class="form-group">
+                            <label for="emergencyContactName">Contact Name *</label>
+                            <input type="text" id="emergencyContactName" name="emergencyContactName" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="emergencyContactPhone">Contact Phone *</label>
+                            <input type="tel" id="emergencyContactPhone" name="emergencyContactPhone" required placeholder="e.g. +91 98765 43210">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="emergencyContactRelationship">Relationship *</label>
+                            <select id="emergencyContactRelationship" name="emergencyContactRelationship" required>
+                                <option value="">Select Relationship</option>
+                                <option value="Spouse">Spouse</option>
+                                <option value="Parent">Parent</option>
+                                <option value="Sibling">Sibling</option>
+                                <option value="Child">Child</option>
+                                <option value="Friend">Friend</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+
                     <div class="form-group">
                         <label for="checkInDate">Check-In Date *</label>
                         <input type="date" id="checkInDate" name="checkInDate" required>
