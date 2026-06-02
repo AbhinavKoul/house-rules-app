@@ -207,6 +207,105 @@
             color: #721c24;
         }
 
+        .customer-card {
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .customer-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 30px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 900px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            line-height: 20px;
+        }
+
+        .close:hover {
+            color: #000;
+        }
+
+        .booking-history-table {
+            width: 100%;
+            margin-top: 20px;
+        }
+
+        .booking-history-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .booking-history-table th,
+        .booking-history-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .booking-history-table th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-weight: 600;
+        }
+
+        .booking-history-table tr:hover {
+            background-color: #f5f5f5;
+        }
+
+        .booking-status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .booking-status-badge.active {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .booking-status-badge.completed {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
         .summary-cards {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -372,13 +471,32 @@
                         <div class="summary-value" id="recurringRate">0%</div>
                         <div class="summary-label">Recurring Rate</div>
                     </div>
+                    <div class="summary-card">
+                        <div class="summary-value" id="avgStayDuration">0</div>
+                        <div class="summary-label">Avg. Stay Duration (days)</div>
+                    </div>
                 </div>
 
                 <div class="chart-container">
-                    <h3>Recurring Customers</h3>
+                    <h3>Recurring Customers <span style="font-size: 0.85em; color: #999;">(Click to view booking history)</span></h3>
                     <div id="customersGrid" class="customers-grid">
                         <div class="loading">Loading customer data...</div>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Customer Booking History Modal -->
+        <div id="customerModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="modalCustomerName">Customer Booking History</h2>
+                    <span class="close" onclick="closeCustomerModal()">&times;</span>
+                </div>
+                <div id="modalCustomerDetails"></div>
+                <div class="booking-history-table">
+                    <h3>All Bookings</h3>
+                    <div id="modalBookingHistory"></div>
                 </div>
             </div>
         </div>
@@ -486,7 +604,8 @@
                                     return [
                                         `Occupancy: ${dataPoint.occupancyRate}%`,
                                         `Days Filled: ${dataPoint.filledDays} / ${dataPoint.totalDays}`,
-                                        `Bookings: ${dataPoint.bookings}`
+                                        `Bookings: ${dataPoint.bookings}`,
+                                        `Avg. Stay: ${dataPoint.avgStayDuration} days`
                                     ];
                                 }
                             }
@@ -598,6 +717,7 @@
                 document.getElementById('totalCustomers').textContent = result.summary.totalCustomers;
                 document.getElementById('recurringCustomers').textContent = result.summary.totalRecurringCustomers;
                 document.getElementById('recurringRate').textContent = result.summary.recurringRate + '%';
+                document.getElementById('avgStayDuration').textContent = result.summary.avgStayDuration || 0;
 
                 // Render customer cards
                 const grid = document.getElementById('customersGrid');
@@ -671,6 +791,9 @@
                         </div>
                     `;
 
+                    // Add click handler to show booking history
+                    card.addEventListener('click', () => showCustomerBookings(customer));
+
                     grid.appendChild(card);
                 });
 
@@ -694,6 +817,109 @@
                 document.getElementById('occupancyDashboard').classList.add('active');
             } else if (tab === 'customers') {
                 document.getElementById('customersDashboard').classList.add('active');
+            }
+        }
+
+        function showCustomerBookings(customer) {
+            const modal = document.getElementById('customerModal');
+
+            // Set customer name in modal header
+            document.getElementById('modalCustomerName').textContent = `${customer.name}'s Booking History`;
+
+            // Build customer details section
+            const detailsHtml = `
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                        <div>
+                            <strong>Government ID:</strong><br>
+                            ${customer.govtIdType}: ${customer.govtIdNumber}
+                        </div>
+                        <div>
+                            <strong>Primary Email:</strong><br>
+                            ${customer.email}
+                            ${customer.hasMultipleEmails ? `<br><small style="color: #ff9800;">Used ${customer.allEmails.length} emails total</small>` : ''}
+                        </div>
+                        <div>
+                            <strong>Total Visits:</strong><br>
+                            ${customer.bookingCount}
+                        </div>
+                        <div>
+                            <strong>Customer Since:</strong><br>
+                            ${new Date(customer.firstVisit).toLocaleDateString()}
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('modalCustomerDetails').innerHTML = detailsHtml;
+
+            // Build booking history table
+            let tableHtml = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Booking #</th>
+                            <th>Check-In</th>
+                            <th>Check-Out</th>
+                            <th>Duration</th>
+                            <th>Guests</th>
+                            <th>Email Used</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            customer.bookings.forEach(booking => {
+                const checkIn = new Date(booking.check_in);
+                const checkOut = new Date(booking.check_out);
+                const duration = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
+                const status = checkOut < new Date() ? 'completed' : 'active';
+                const statusText = status === 'active' ? 'Active' : 'Completed';
+
+                tableHtml += `
+                    <tr>
+                        <td>#${booking.id}</td>
+                        <td>${checkIn.toLocaleDateString()}</td>
+                        <td>${checkOut.toLocaleDateString()}</td>
+                        <td>${duration} days</td>
+                        <td>${booking.guests}</td>
+                        <td style="font-size: 0.85em;">${booking.email}</td>
+                        <td><span class="booking-status-badge ${status}">${statusText}</span></td>
+                    </tr>
+                `;
+            });
+
+            tableHtml += '</tbody></table>';
+
+            // Calculate average stay duration for this customer
+            const totalDays = customer.bookings.reduce((sum, booking) => {
+                const checkIn = new Date(booking.check_in);
+                const checkOut = new Date(booking.check_out);
+                return sum + Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
+            }, 0);
+            const avgDuration = Math.round(totalDays / customer.bookings.length);
+
+            tableHtml = `
+                <div style="background: #e3f2fd; padding: 10px; border-radius: 6px; margin-bottom: 15px; text-align: center;">
+                    <strong>Average Stay Duration:</strong> ${avgDuration} days |
+                    <strong>Total Days Stayed:</strong> ${totalDays} days
+                </div>
+            ` + tableHtml;
+
+            document.getElementById('modalBookingHistory').innerHTML = tableHtml;
+
+            modal.style.display = 'block';
+        }
+
+        function closeCustomerModal() {
+            document.getElementById('customerModal').style.display = 'none';
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('customerModal');
+            if (event.target == modal) {
+                closeCustomerModal();
             }
         }
 

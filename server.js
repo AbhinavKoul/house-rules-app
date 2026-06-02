@@ -638,12 +638,25 @@ app.get('/api/statistics/occupancy', async (req, res) => {
                  (checkIn <= periodStart && checkOut >= periodEnd);
         });
 
+        // Calculate average stay duration for this period
+        const activeBookings = periodBookings.filter(b => !b.cancelled);
+        let avgStayDuration = 0;
+        if (activeBookings.length > 0) {
+          const totalDuration = activeBookings.reduce((sum, b) => {
+            const checkIn = new Date(b.check_in_date);
+            const checkOut = new Date(b.check_out_date);
+            return sum + Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
+          }, 0);
+          avgStayDuration = Math.round(totalDuration / activeBookings.length);
+        }
+
         occupancyData.push({
           label: periodStart.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
           occupancyRate: parseFloat(occupancyRate),
           filledDays,
           totalDays: daysInPeriod,
-          bookings: periodBookings.filter(b => !b.cancelled).length,
+          bookings: activeBookings.length,
+          avgStayDuration,
           periodStart: periodStart.toISOString().split('T')[0],
           periodEnd: periodEnd.toISOString().split('T')[0]
         });
@@ -672,12 +685,25 @@ app.get('/api/statistics/occupancy', async (req, res) => {
                  (checkIn <= periodStart && checkOut >= periodEnd);
         });
 
+        // Calculate average stay duration for this period
+        const activeBookings = periodBookings.filter(b => !b.cancelled);
+        let avgStayDuration = 0;
+        if (activeBookings.length > 0) {
+          const totalDuration = activeBookings.reduce((sum, b) => {
+            const checkIn = new Date(b.check_in_date);
+            const checkOut = new Date(b.check_out_date);
+            return sum + Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
+          }, 0);
+          avgStayDuration = Math.round(totalDuration / activeBookings.length);
+        }
+
         occupancyData.push({
           label: `Q${quarter + 1} ${year}`,
           occupancyRate: parseFloat(occupancyRate),
           filledDays,
           totalDays: daysInPeriod,
-          bookings: periodBookings.filter(b => !b.cancelled).length,
+          bookings: activeBookings.length,
+          avgStayDuration,
           periodStart: periodStart.toISOString().split('T')[0],
           periodEnd: periodEnd.toISOString().split('T')[0]
         });
@@ -702,12 +728,25 @@ app.get('/api/statistics/occupancy', async (req, res) => {
                  (checkIn <= periodStart && checkOut >= periodEnd);
         });
 
+        // Calculate average stay duration for this period
+        const activeBookings = periodBookings.filter(b => !b.cancelled);
+        let avgStayDuration = 0;
+        if (activeBookings.length > 0) {
+          const totalDuration = activeBookings.reduce((sum, b) => {
+            const checkIn = new Date(b.check_in_date);
+            const checkOut = new Date(b.check_out_date);
+            return sum + Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
+          }, 0);
+          avgStayDuration = Math.round(totalDuration / activeBookings.length);
+        }
+
         occupancyData.push({
           label: year.toString(),
           occupancyRate: parseFloat(occupancyRate),
           filledDays,
           totalDays: daysInPeriod,
-          bookings: periodBookings.filter(b => !b.cancelled).length,
+          bookings: activeBookings.length,
+          avgStayDuration,
           periodStart: periodStart.toISOString().split('T')[0],
           periodEnd: periodEnd.toISOString().split('T')[0]
         });
@@ -819,11 +858,22 @@ app.get('/api/statistics/recurring-customers', async (req, res) => {
     const totalCustomers = parseInt(totalAllCustomersResult.rows[0].count);
     const recurringRate = totalCustomers > 0 ? ((totalRecurringCustomers / totalCustomers) * 100).toFixed(1) : '0.0';
 
+    // Calculate average stay duration across all bookings
+    const avgStayResult = await pool.query(`
+      SELECT AVG(check_out_date - check_in_date) as avg_duration
+      FROM acknowledgments
+      WHERE cancelled = FALSE
+    `);
+    const avgStayDuration = avgStayResult.rows[0].avg_duration
+      ? Math.round(parseFloat(avgStayResult.rows[0].avg_duration))
+      : 0;
+
     res.json({
       summary: {
         totalRecurringCustomers,
         totalCustomers,
-        recurringRate: parseFloat(recurringRate)
+        recurringRate: parseFloat(recurringRate),
+        avgStayDuration
       },
       customers: enrichedCustomers
     });
