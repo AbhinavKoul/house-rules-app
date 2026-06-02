@@ -306,6 +306,72 @@
             color: #0c5460;
         }
 
+        .clickable-row {
+            cursor: pointer;
+        }
+
+        .clickable-row:hover {
+            background-color: #e3f2fd !important;
+        }
+
+        .view-booking-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 4px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85em;
+        }
+
+        .view-booking-btn:hover {
+            background: #5568d3;
+        }
+
+        .booking-details-modal .modal-content {
+            max-width: 800px;
+        }
+
+        .detail-section {
+            margin-bottom: 25px;
+        }
+
+        .detail-section h3 {
+            color: #667eea;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 8px;
+            margin-bottom: 15px;
+        }
+
+        .detail-row {
+            display: grid;
+            grid-template-columns: 200px 1fr;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .detail-label {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .detail-value {
+            color: #666;
+        }
+
+        .guest-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border-left: 4px solid #667eea;
+        }
+
+        .guest-card h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
         .summary-cards {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -495,9 +561,20 @@
                 </div>
                 <div id="modalCustomerDetails"></div>
                 <div class="booking-history-table">
-                    <h3>All Bookings</h3>
+                    <h3>All Bookings <span style="font-size: 0.85em; color: #999;">(Click to view details)</span></h3>
                     <div id="modalBookingHistory"></div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Booking Details Modal -->
+        <div id="bookingDetailsModal" class="modal booking-details-modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Booking Details</h2>
+                    <span class="close" onclick="closeBookingDetailsModal()">&times;</span>
+                </div>
+                <div id="bookingDetailsContent"></div>
             </div>
         </div>
     </div>
@@ -506,6 +583,7 @@
         let hostKey = '';
         let occupancyChart = null;
         let occupancyData = [];
+        let allBookings = []; // Cache all bookings for quick lookup
 
         async function loadDashboard() {
             hostKey = document.getElementById('hostKey').value.trim();
@@ -525,6 +603,12 @@
                     showMessage('Invalid host key', 'error');
                     return;
                 }
+
+                // Load all bookings for quick lookup
+                const bookingsResponse = await fetch('/api/acknowledgments', {
+                    headers: { 'X-Host-Key': hostKey }
+                });
+                allBookings = await bookingsResponse.json();
 
                 document.getElementById('dashboardContent').style.display = 'block';
                 await loadOccupancyData();
@@ -630,16 +714,12 @@
             infoDiv.innerHTML = `
                 <strong>${period.label}</strong> -
                 Occupancy: ${period.occupancyRate}%
-                (${period.filledDays} of ${period.totalDays} days filled, ${period.bookings} bookings)
+                (${period.filledDays} of ${period.totalDays} days filled, ${period.bookings} bookings) -
+                <em style="color: #667eea;">Click any row to view booking details</em>
             `;
 
-            // Fetch full booking details for this period
+            // Use cached bookings
             try {
-                const response = await fetch('/api/acknowledgments', {
-                    headers: { 'X-Host-Key': hostKey }
-                });
-
-                const allBookings = await response.json();
 
                 // Filter bookings for this period
                 const periodStart = new Date(period.periodStart);
@@ -680,7 +760,7 @@
                                      new Date(booking.check_out_date) < new Date() ? 'Completed' : 'Active';
 
                         html += `
-                            <tr>
+                            <tr class="clickable-row" onclick="viewBookingDetails(${booking.id})">
                                 <td>${booking.id}</td>
                                 <td>${booking.name}</td>
                                 <td>${booking.email}</td>
@@ -877,7 +957,7 @@
                 const statusText = status === 'active' ? 'Active' : 'Completed';
 
                 tableHtml += `
-                    <tr>
+                    <tr class="clickable-row" onclick="viewBookingDetails(${booking.id})">
                         <td>#${booking.id}</td>
                         <td>${checkIn.toLocaleDateString()}</td>
                         <td>${checkOut.toLocaleDateString()}</td>
@@ -915,11 +995,171 @@
             document.getElementById('customerModal').style.display = 'none';
         }
 
+        function closeBookingDetailsModal() {
+            document.getElementById('bookingDetailsModal').style.display = 'none';
+        }
+
+        function viewBookingDetails(bookingId) {
+            const booking = allBookings.find(b => b.id === bookingId);
+            if (!booking) {
+                showMessage('Booking not found', 'error');
+                return;
+            }
+
+            const checkIn = new Date(booking.check_in_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            const checkOut = new Date(booking.check_out_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            const acknowledgedAt = new Date(booking.acknowledged_at).toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            const dob = new Date(booking.dob).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+            let html = `
+                <h2>Booking Details - ID #${booking.id}</h2>
+
+                <div class="detail-section">
+                    <h3>Primary Guest Information</h3>
+                    <div class="detail-row">
+                        <div class="detail-label">Full Name:</div>
+                        <div class="detail-value">${booking.name}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Email:</div>
+                        <div class="detail-value">${booking.email}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Date of Birth:</div>
+                        <div class="detail-value">${dob}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Government ID Type:</div>
+                        <div class="detail-value">${booking.govt_id_type}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Government ID Number:</div>
+                        <div class="detail-value">${booking.govt_id_number}</div>
+                    </div>
+                </div>
+
+                ${booking.emergency_contact_name ? `
+                <div class="detail-section">
+                    <h3>Emergency Contact</h3>
+                    <div class="detail-row">
+                        <div class="detail-label">Name:</div>
+                        <div class="detail-value">${booking.emergency_contact_name}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Phone:</div>
+                        <div class="detail-value">${booking.emergency_contact_phone}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Relationship:</div>
+                        <div class="detail-value">${booking.emergency_contact_relationship}</div>
+                    </div>
+                </div>
+                ` : ''}
+
+                <div class="detail-section">
+                    <h3>Booking Information</h3>
+                    <div class="detail-row">
+                        <div class="detail-label">Check-In Date:</div>
+                        <div class="detail-value">${checkIn}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Check-Out Date:</div>
+                        <div class="detail-value">${checkOut}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Number of Adults:</div>
+                        <div class="detail-value">${booking.number_of_guests}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Number of Children:</div>
+                        <div class="detail-value">${booking.number_of_children || 0}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Total Guests:</div>
+                        <div class="detail-value">${booking.number_of_guests + (booking.number_of_children || 0)}</div>
+                    </div>
+                    ${booking.relationship_type ? `
+                    <div class="detail-row">
+                        <div class="detail-label">Relationship Type:</div>
+                        <div class="detail-value">${booking.relationship_type}</div>
+                    </div>
+                    ` : ''}
+                    <div class="detail-row">
+                        <div class="detail-label">Status:</div>
+                        <div class="detail-value ${
+                            booking.cancelled ? 'status-cancelled' :
+                            new Date(booking.check_out_date) < new Date() ? 'status-completed' :
+                            'status-active'
+                        }">
+                            ${
+                                booking.cancelled ? 'Cancelled' :
+                                new Date(booking.check_out_date) < new Date() ? 'Completed' :
+                                'Active'
+                            }
+                        </div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Acknowledged At:</div>
+                        <div class="detail-value">${acknowledgedAt}</div>
+                    </div>
+                    ${booking.ip_address ? `
+                    <div class="detail-row">
+                        <div class="detail-label">IP Address:</div>
+                        <div class="detail-value">${booking.ip_address}</div>
+                    </div>
+                    ` : ''}
+                </div>
+            `;
+
+            // Add additional guests section if there are any
+            if (booking.additional_guests && booking.additional_guests.length > 0) {
+                html += `
+                    <div class="detail-section">
+                        <h3>Additional Adult Guests (${booking.additional_guests.length})</h3>
+                `;
+
+                booking.additional_guests.forEach((guest, index) => {
+                    const guestDob = new Date(guest.dob).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+                    html += `
+                        <div class="guest-card">
+                            <h4>Guest ${index + 2}</h4>
+                            <div class="detail-row">
+                                <div class="detail-label">Full Name:</div>
+                                <div class="detail-value">${guest.name}</div>
+                            </div>
+                            <div class="detail-row">
+                                <div class="detail-label">Date of Birth:</div>
+                                <div class="detail-value">${guestDob}</div>
+                            </div>
+                            <div class="detail-row">
+                                <div class="detail-label">Government ID Type:</div>
+                                <div class="detail-value">${guest.govtIdType}</div>
+                            </div>
+                            <div class="detail-row">
+                                <div class="detail-label">Government ID Number:</div>
+                                <div class="detail-value">${guest.govtIdNumber}</div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html += '</div>';
+            }
+
+            document.getElementById('bookingDetailsContent').innerHTML = html;
+            document.getElementById('bookingDetailsModal').style.display = 'block';
+        }
+
         // Close modal when clicking outside
         window.onclick = function(event) {
-            const modal = document.getElementById('customerModal');
-            if (event.target == modal) {
+            const customerModal = document.getElementById('customerModal');
+            const bookingModal = document.getElementById('bookingDetailsModal');
+
+            if (event.target == customerModal) {
                 closeCustomerModal();
+            }
+            if (event.target == bookingModal) {
+                closeBookingDetailsModal();
             }
         }
 
