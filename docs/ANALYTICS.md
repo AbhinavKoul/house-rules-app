@@ -38,14 +38,21 @@ Or access from the admin panel by clicking the "📊 Analytics Dashboard" button
 
 **Purpose:** Track customer loyalty and identify re-engagement opportunities for targeted marketing campaigns.
 
+**Key Feature:** Customers are identified by their **government ID number** rather than email or name, ensuring accurate tracking even when customers:
+- Use different email addresses across bookings
+- Have slight variations in their name
+- Book through different accounts
+
 **Summary Metrics:**
-- Total unique customers
+- Total unique customers (by govt ID)
 - Recurring customers count
 - Recurring rate percentage
 
 **Customer Cards Display:**
 Each recurring customer (2+ visits) shows:
-- Name and email
+- Primary name and email (from most recent booking)
+- Government ID type and number
+- Warning indicators if multiple emails/names used
 - Number of visits (badge)
 - First visit date
 - Last visit date
@@ -108,7 +115,7 @@ Returns occupancy data over time.
 ```
 
 ### GET /api/statistics/recurring-customers
-Returns customer loyalty metrics.
+Returns customer loyalty metrics grouped by government ID.
 
 **Response:**
 ```json
@@ -120,8 +127,14 @@ Returns customer loyalty metrics.
   },
   "customers": [
     {
-      "email": "customer@example.com",
+      "govtIdNumber": "123456789012",
+      "govtIdType": "Aadhar",
+      "email": "current@example.com",
+      "allEmails": ["old@example.com", "current@example.com"],
       "name": "John Doe",
+      "allNames": ["John Doe", "J. Doe"],
+      "hasMultipleEmails": true,
+      "hasMultipleNames": true,
       "bookingCount": 3,
       "firstVisit": "2025-06-15",
       "lastVisit": "2026-01-10",
@@ -134,6 +147,8 @@ Returns customer loyalty metrics.
   ]
 }
 ```
+
+**Note:** Customers are identified by government ID to ensure accurate tracking across different emails and name variations.
 
 ## Data Export for Marketing Tools
 

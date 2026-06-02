@@ -731,11 +731,14 @@ app.get('/api/statistics/recurring-customers', async (req, res) => {
   }
 
   try {
-    // Get all completed (non-cancelled) bookings grouped by email
+    // Get all completed (non-cancelled) bookings grouped by government ID
+    // This is more reliable than email as customers may use different emails
     const query = `
       SELECT
-        email,
-        name,
+        govt_id_number,
+        govt_id_type,
+        ARRAY_AGG(DISTINCT email) as emails,
+        ARRAY_AGG(DISTINCT name) as names,
         COUNT(*) as booking_count,
         MIN(check_in_date) as first_visit,
         MAX(check_out_date) as last_visit,
@@ -745,12 +748,14 @@ app.get('/api/statistics/recurring-customers', async (req, res) => {
             'id', id,
             'check_in', check_in_date,
             'check_out', check_out_date,
-            'guests', number_of_guests + COALESCE(number_of_children, 0)
+            'guests', number_of_guests + COALESCE(number_of_children, 0),
+            'email', email,
+            'name', name
           ) ORDER BY check_in_date
         ) as bookings
       FROM acknowledgments
       WHERE cancelled = FALSE
-      GROUP BY email, name
+      GROUP BY govt_id_number, govt_id_type
       HAVING COUNT(*) > 1
       ORDER BY COUNT(*) DESC, MAX(check_out_date) DESC
     `;
@@ -777,9 +782,24 @@ app.get('/api/statistics/recurring-customers', async (req, res) => {
         avgDaysBetweenVisits = Math.round(totalDays / (customer.bookings.length - 1));
       }
 
+      // Get most recent name and primary email
+      const mostRecentBooking = customer.bookings[customer.bookings.length - 1];
+      const primaryEmail = mostRecentBooking.email;
+      const primaryName = mostRecentBooking.name;
+
+      // Check if customer used different emails or names
+      const hasMultipleEmails = customer.emails.length > 1;
+      const hasMultipleNames = customer.names.length > 1;
+
       return {
-        email: customer.email,
-        name: customer.name,
+        govtIdNumber: customer.govt_id_number,
+        govtIdType: customer.govt_id_type,
+        email: primaryEmail,
+        allEmails: customer.emails,
+        name: primaryName,
+        allNames: customer.names,
+        hasMultipleEmails,
+        hasMultipleNames,
         bookingCount: parseInt(customer.booking_count),
         firstVisit: customer.first_visit,
         lastVisit: customer.last_visit,
@@ -794,10 +814,10 @@ app.get('/api/statistics/recurring-customers', async (req, res) => {
     // Summary statistics
     const totalRecurringCustomers = enrichedCustomers.length;
     const totalAllCustomersResult = await pool.query(
-      'SELECT COUNT(DISTINCT email) as count FROM acknowledgments WHERE cancelled = FALSE'
+      'SELECT COUNT(DISTINCT govt_id_number) as count FROM acknowledgments WHERE cancelled = FALSE'
     );
     const totalCustomers = parseInt(totalAllCustomersResult.rows[0].count);
-    const recurringRate = ((totalRecurringCustomers / totalCustomers) * 100).toFixed(1);
+    const recurringRate = totalCustomers > 0 ? ((totalRecurringCustomers / totalCustomers) * 100).toFixed(1) : '0.0';
 
     res.json({
       summary: {

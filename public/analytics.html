@@ -625,11 +625,26 @@
                         alertText = `Last visit: ${Math.round(customer.daysSinceLastVisit / 30)} months ago - Consider reaching out`;
                     }
 
+                    // Build email display with note if multiple emails used
+                    let emailDisplay = customer.email;
+                    if (customer.hasMultipleEmails) {
+                        emailDisplay += ` <span style="color: #ff9800; font-size: 0.85em;" title="Used ${customer.allEmails.length} different emails: ${customer.allEmails.join(', ')}">(${customer.allEmails.length} emails ⚠️)</span>`;
+                    }
+
+                    // Build name display with note if multiple names used
+                    let nameDisplay = customer.name;
+                    if (customer.hasMultipleNames) {
+                        nameDisplay += ` <span style="color: #ff9800; font-size: 0.8em;" title="Used ${customer.allNames.length} different names: ${customer.allNames.join(', ')}">(${customer.allNames.length} names)</span>`;
+                    }
+
                     card.innerHTML = `
                         <div class="customer-header">
                             <div>
-                                <div class="customer-name">${customer.name}</div>
-                                <div class="customer-email">${customer.email}</div>
+                                <div class="customer-name">${nameDisplay}</div>
+                                <div class="customer-email">${emailDisplay}</div>
+                                <div style="font-size: 0.85em; color: #999; margin-top: 3px;">
+                                    ${customer.govtIdType}: ${customer.govtIdNumber}
+                                </div>
                             </div>
                             <div class="visit-badge">${customer.bookingCount} visits</div>
                         </div>
