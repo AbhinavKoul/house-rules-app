@@ -572,6 +572,104 @@ app.post('/api/update-check-in-date', async (req, res) => {
   }
 });
 
+// Get monthly statistics
+app.get('/api/statistics/monthly', async (req, res) => {
+  const hostKey = req.headers['x-host-key'];
+
+  if (!hostKey || hostKey !== process.env.HOST_KEY) {
+    return res.status(403).json({ error: 'Unauthorized: Invalid or missing host key' });
+  }
+
+  try {
+    // Get current month start and end dates
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+    // Get all bookings for the current month
+    const query = `
+      SELECT
+        id,
+        check_in_date,
+        check_out_date,
+        number_of_guests,
+        number_of_children,
+        cancelled
+      FROM acknowledgments
+      WHERE (
+        (check_in_date >= $1 AND check_in_date <= $2) OR
+        (check_out_date >= $1 AND check_out_date <= $2) OR
+        (check_in_date <= $1 AND check_out_date >= $2)
+      )
+      ORDER BY check_in_date
+    `;
+
+    const result = await pool.query(query, [monthStart, monthEnd]);
+    const bookings = result.rows;
+
+    // Calculate statistics
+    const totalBookings = bookings.length;
+    const activeBookings = bookings.filter(b => !b.cancelled && new Date(b.check_out_date) >= new Date()).length;
+    const completedBookings = bookings.filter(b => !b.cancelled && new Date(b.check_out_date) < new Date()).length;
+    const cancelledBookings = bookings.filter(b => b.cancelled).length;
+
+    // Calculate total guests
+    let totalAdults = 0;
+    let totalChildren = 0;
+    bookings.forEach(b => {
+      if (!b.cancelled) {
+        totalAdults += b.number_of_guests;
+        totalChildren += b.number_of_children || 0;
+      }
+    });
+
+    // Calculate days filled in current month
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const daysInMonth = monthEnd.getDate();
+    let daysFilled = 0;
+
+    // Create a set of filled dates
+    const filledDates = new Set();
+    bookings.forEach(booking => {
+      if (!booking.cancelled) {
+        const checkIn = new Date(booking.check_in_date);
+        const checkOut = new Date(booking.check_out_date);
+
+        // Iterate through each day of the booking
+        let currentDate = new Date(Math.max(checkIn, monthStart));
+        const endDate = new Date(Math.min(checkOut, monthEnd));
+
+        while (currentDate < endDate) {
+          filledDates.add(currentDate.toISOString().split('T')[0]);
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
+      }
+    });
+
+    daysFilled = filledDates.size;
+    const fillPercentage = ((daysFilled / daysInMonth) * 100).toFixed(1);
+
+    res.json({
+      month: now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+      totalBookings,
+      activeBookings,
+      completedBookings,
+      cancelledBookings,
+      totalAdults,
+      totalChildren,
+      totalGuests: totalAdults + totalChildren,
+      daysInMonth,
+      daysFilled,
+      fillPercentage: parseFloat(fillPercentage)
+    });
+
+  } catch (err) {
+    console.error('Database error:', err);
+    res.status(500).json({ error: 'Failed to fetch statistics' });
+  }
+});
+
 // Update check-out date
 app.post('/api/update-check-out-date', async (req, res) => {
   const { bookingId, checkOutDate, hostKey } = req.body;
