@@ -572,8 +572,158 @@ app.post('/api/update-check-in-date', async (req, res) => {
   }
 });
 
-// Get monthly statistics
-app.get('/api/statistics/monthly', async (req, res) => {
+// Get occupancy statistics over time
+app.get('/api/statistics/occupancy', async (req, res) => {
+  const hostKey = req.headers['x-host-key'];
+
+  if (!hostKey || hostKey !== process.env.HOST_KEY) {
+    return res.status(403).json({ error: 'Unauthorized: Invalid or missing host key' });
+  }
+
+  const view = req.query.view || 'monthly'; // monthly, quarterly, yearly
+  const periods = parseInt(req.query.periods) || 12; // number of periods to show
+
+  try {
+    const result = await pool.query(
+      'SELECT check_in_date, check_out_date, cancelled FROM acknowledgments ORDER BY check_in_date'
+    );
+    const bookings = result.rows;
+
+    const now = new Date();
+    const occupancyData = [];
+
+    // Helper function to calculate days in a period
+    const getDaysInPeriod = (startDate, endDate) => {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      return Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+    };
+
+    // Helper function to count filled days in a period
+    const getFilledDays = (periodStart, periodEnd, bookings) => {
+      const filledDates = new Set();
+      bookings.forEach(booking => {
+        if (!booking.cancelled) {
+          const checkIn = new Date(booking.check_in_date);
+          const checkOut = new Date(booking.check_out_date);
+
+          let currentDate = new Date(Math.max(checkIn, periodStart));
+          const endDate = new Date(Math.min(checkOut, periodEnd));
+
+          while (currentDate < endDate) {
+            filledDates.add(currentDate.toISOString().split('T')[0]);
+            currentDate.setDate(currentDate.getDate() + 1);
+          }
+        }
+      });
+      return filledDates.size;
+    };
+
+    if (view === 'monthly') {
+      // Generate monthly data
+      for (let i = periods - 1; i >= 0; i--) {
+        const periodStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const periodEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
+        periodEnd.setHours(23, 59, 59, 999);
+
+        const daysInPeriod = periodEnd.getDate();
+        const filledDays = getFilledDays(periodStart, periodEnd, bookings);
+        const occupancyRate = ((filledDays / daysInPeriod) * 100).toFixed(1);
+
+        const periodBookings = bookings.filter(b => {
+          const checkIn = new Date(b.check_in_date);
+          const checkOut = new Date(b.check_out_date);
+          return (checkIn >= periodStart && checkIn <= periodEnd) ||
+                 (checkOut >= periodStart && checkOut <= periodEnd) ||
+                 (checkIn <= periodStart && checkOut >= periodEnd);
+        });
+
+        occupancyData.push({
+          label: periodStart.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+          occupancyRate: parseFloat(occupancyRate),
+          filledDays,
+          totalDays: daysInPeriod,
+          bookings: periodBookings.filter(b => !b.cancelled).length,
+          periodStart: periodStart.toISOString().split('T')[0],
+          periodEnd: periodEnd.toISOString().split('T')[0]
+        });
+      }
+    } else if (view === 'quarterly') {
+      // Generate quarterly data
+      for (let i = periods - 1; i >= 0; i--) {
+        const currentQuarter = Math.floor(now.getMonth() / 3);
+        const targetQuarter = currentQuarter - i;
+        const year = now.getFullYear() + Math.floor(targetQuarter / 4);
+        const quarter = ((targetQuarter % 4) + 4) % 4;
+
+        const periodStart = new Date(year, quarter * 3, 1);
+        const periodEnd = new Date(year, quarter * 3 + 3, 0);
+        periodEnd.setHours(23, 59, 59, 999);
+
+        const daysInPeriod = getDaysInPeriod(periodStart, periodEnd);
+        const filledDays = getFilledDays(periodStart, periodEnd, bookings);
+        const occupancyRate = ((filledDays / daysInPeriod) * 100).toFixed(1);
+
+        const periodBookings = bookings.filter(b => {
+          const checkIn = new Date(b.check_in_date);
+          const checkOut = new Date(b.check_out_date);
+          return (checkIn >= periodStart && checkIn <= periodEnd) ||
+                 (checkOut >= periodStart && checkOut <= periodEnd) ||
+                 (checkIn <= periodStart && checkOut >= periodEnd);
+        });
+
+        occupancyData.push({
+          label: `Q${quarter + 1} ${year}`,
+          occupancyRate: parseFloat(occupancyRate),
+          filledDays,
+          totalDays: daysInPeriod,
+          bookings: periodBookings.filter(b => !b.cancelled).length,
+          periodStart: periodStart.toISOString().split('T')[0],
+          periodEnd: periodEnd.toISOString().split('T')[0]
+        });
+      }
+    } else if (view === 'yearly') {
+      // Generate yearly data
+      for (let i = periods - 1; i >= 0; i--) {
+        const year = now.getFullYear() - i;
+        const periodStart = new Date(year, 0, 1);
+        const periodEnd = new Date(year, 11, 31);
+        periodEnd.setHours(23, 59, 59, 999);
+
+        const daysInPeriod = getDaysInPeriod(periodStart, periodEnd);
+        const filledDays = getFilledDays(periodStart, periodEnd, bookings);
+        const occupancyRate = ((filledDays / daysInPeriod) * 100).toFixed(1);
+
+        const periodBookings = bookings.filter(b => {
+          const checkIn = new Date(b.check_in_date);
+          const checkOut = new Date(b.check_out_date);
+          return (checkIn >= periodStart && checkIn <= periodEnd) ||
+                 (checkOut >= periodStart && checkOut <= periodEnd) ||
+                 (checkIn <= periodStart && checkOut >= periodEnd);
+        });
+
+        occupancyData.push({
+          label: year.toString(),
+          occupancyRate: parseFloat(occupancyRate),
+          filledDays,
+          totalDays: daysInPeriod,
+          bookings: periodBookings.filter(b => !b.cancelled).length,
+          periodStart: periodStart.toISOString().split('T')[0],
+          periodEnd: periodEnd.toISOString().split('T')[0]
+        });
+      }
+    }
+
+    res.json({ view, data: occupancyData });
+
+  } catch (err) {
+    console.error('Database error:', err);
+    res.status(500).json({ error: 'Failed to fetch occupancy statistics' });
+  }
+});
+
+// Get recurring customer statistics
+app.get('/api/statistics/recurring-customers', async (req, res) => {
   const hostKey = req.headers['x-host-key'];
 
   if (!hostKey || hostKey !== process.env.HOST_KEY) {
@@ -581,92 +731,86 @@ app.get('/api/statistics/monthly', async (req, res) => {
   }
 
   try {
-    // Get current month start and end dates
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-    // Get all bookings for the current month
+    // Get all completed (non-cancelled) bookings grouped by email
     const query = `
       SELECT
-        id,
-        check_in_date,
-        check_out_date,
-        number_of_guests,
-        number_of_children,
-        cancelled
+        email,
+        name,
+        COUNT(*) as booking_count,
+        MIN(check_in_date) as first_visit,
+        MAX(check_out_date) as last_visit,
+        SUM(number_of_guests + COALESCE(number_of_children, 0)) as total_guests_brought,
+        ARRAY_AGG(
+          json_build_object(
+            'id', id,
+            'check_in', check_in_date,
+            'check_out', check_out_date,
+            'guests', number_of_guests + COALESCE(number_of_children, 0)
+          ) ORDER BY check_in_date
+        ) as bookings
       FROM acknowledgments
-      WHERE (
-        (check_in_date >= $1 AND check_in_date <= $2) OR
-        (check_out_date >= $1 AND check_out_date <= $2) OR
-        (check_in_date <= $1 AND check_out_date >= $2)
-      )
-      ORDER BY check_in_date
+      WHERE cancelled = FALSE
+      GROUP BY email, name
+      HAVING COUNT(*) > 1
+      ORDER BY COUNT(*) DESC, MAX(check_out_date) DESC
     `;
 
-    const result = await pool.query(query, [monthStart, monthEnd]);
-    const bookings = result.rows;
+    const result = await pool.query(query);
+    const recurringCustomers = result.rows;
 
-    // Calculate statistics
-    const totalBookings = bookings.length;
-    const activeBookings = bookings.filter(b => !b.cancelled && new Date(b.check_out_date) >= new Date()).length;
-    const completedBookings = bookings.filter(b => !b.cancelled && new Date(b.check_out_date) < new Date()).length;
-    const cancelledBookings = bookings.filter(b => b.cancelled).length;
+    // Calculate additional metrics
+    const enrichedCustomers = recurringCustomers.map(customer => {
+      const firstVisit = new Date(customer.first_visit);
+      const lastVisit = new Date(customer.last_visit);
+      const daysSinceFirst = Math.floor((new Date() - firstVisit) / (1000 * 60 * 60 * 24));
+      const daysSinceLast = Math.floor((new Date() - lastVisit) / (1000 * 60 * 60 * 24));
 
-    // Calculate total guests
-    let totalAdults = 0;
-    let totalChildren = 0;
-    bookings.forEach(b => {
-      if (!b.cancelled) {
-        totalAdults += b.number_of_guests;
-        totalChildren += b.number_of_children || 0;
-      }
-    });
-
-    // Calculate days filled in current month
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const daysInMonth = monthEnd.getDate();
-    let daysFilled = 0;
-
-    // Create a set of filled dates
-    const filledDates = new Set();
-    bookings.forEach(booking => {
-      if (!booking.cancelled) {
-        const checkIn = new Date(booking.check_in_date);
-        const checkOut = new Date(booking.check_out_date);
-
-        // Iterate through each day of the booking
-        let currentDate = new Date(Math.max(checkIn, monthStart));
-        const endDate = new Date(Math.min(checkOut, monthEnd));
-
-        while (currentDate < endDate) {
-          filledDates.add(currentDate.toISOString().split('T')[0]);
-          currentDate.setDate(currentDate.getDate() + 1);
+      // Calculate average days between visits
+      let avgDaysBetweenVisits = 0;
+      if (customer.bookings.length > 1) {
+        let totalDays = 0;
+        for (let i = 1; i < customer.bookings.length; i++) {
+          const prevCheckout = new Date(customer.bookings[i - 1].check_out);
+          const currentCheckin = new Date(customer.bookings[i].check_in);
+          totalDays += Math.floor((currentCheckin - prevCheckout) / (1000 * 60 * 60 * 24));
         }
+        avgDaysBetweenVisits = Math.round(totalDays / (customer.bookings.length - 1));
       }
+
+      return {
+        email: customer.email,
+        name: customer.name,
+        bookingCount: parseInt(customer.booking_count),
+        firstVisit: customer.first_visit,
+        lastVisit: customer.last_visit,
+        daysSinceLastVisit: daysSinceLast,
+        daysSinceFirstVisit: daysSinceFirst,
+        avgDaysBetweenVisits,
+        totalGuestsBrought: parseInt(customer.total_guests_brought),
+        bookings: customer.bookings
+      };
     });
 
-    daysFilled = filledDates.size;
-    const fillPercentage = ((daysFilled / daysInMonth) * 100).toFixed(1);
+    // Summary statistics
+    const totalRecurringCustomers = enrichedCustomers.length;
+    const totalAllCustomersResult = await pool.query(
+      'SELECT COUNT(DISTINCT email) as count FROM acknowledgments WHERE cancelled = FALSE'
+    );
+    const totalCustomers = parseInt(totalAllCustomersResult.rows[0].count);
+    const recurringRate = ((totalRecurringCustomers / totalCustomers) * 100).toFixed(1);
 
     res.json({
-      month: now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-      totalBookings,
-      activeBookings,
-      completedBookings,
-      cancelledBookings,
-      totalAdults,
-      totalChildren,
-      totalGuests: totalAdults + totalChildren,
-      daysInMonth,
-      daysFilled,
-      fillPercentage: parseFloat(fillPercentage)
+      summary: {
+        totalRecurringCustomers,
+        totalCustomers,
+        recurringRate: parseFloat(recurringRate)
+      },
+      customers: enrichedCustomers
     });
 
   } catch (err) {
     console.error('Database error:', err);
-    res.status(500).json({ error: 'Failed to fetch statistics' });
+    res.status(500).json({ error: 'Failed to fetch recurring customer statistics' });
   }
 });
 
