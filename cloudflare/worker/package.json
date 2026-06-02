@@ -1,0 +1,21 @@
+{
+  "name": "shreeganeshkunj-worker",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker for routing shreeganeshkunj.com traffic",
+  "main": "index.js",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "tail": "wrangler tail"
+  },
+  "keywords": [
+    "cloudflare",
+    "worker",
+    "routing"
+  ],
+  "author": "Abhinav Koul",
+  "license": "MIT",
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}

@@ -2,10 +2,46 @@
 
 A web application for viewing and acknowledging house rules. Users can read the house rules and submit their acknowledgment along with their personal information and booking dates.
 
+## Live URLs
+
+### Production (Custom Domain)
+- **Website**: `https://shreeganeshkunj.com` (redirects to Airbnb)
+- **House Rules Form**: `https://shreeganeshkunj.com/house-rules`
+- **Admin Panel**: `https://shreeganeshkunj.com/admin`
+- **Analytics Dashboard**: `https://shreeganeshkunj.com/analytics`
+
+### Heroku (Backwards Compatible)
+- **Production**: `https://house-rules-acknowledgment-91bc2e7022ee.herokuapp.com`
+- **Local Development**: `http://localhost:3000`
+
+## Repository Structure
+
+```
+├── cloudflare/                  # Cloudflare Worker for domain routing
+│   ├── worker/
+│   │   ├── index.js            # Worker routing logic
+│   │   ├── wrangler.toml       # Worker configuration
+│   │   ├── package.json        # Worker dependencies
+│   │   └── README.md           # Worker documentation
+│   ├── GITHUB_ACTIONS_SETUP.md # CI/CD setup guide
+│   └── CLOUDFLARE_SETUP.md     # Manual setup guide
+├── docs/                        # Documentation
+│   └── ANALYTICS.md            # Analytics features documentation
+├── public/                      # Frontend files
+│   ├── index.html              # House rules form
+│   ├── admin.html              # Admin panel
+│   ├── analytics.html          # Analytics dashboard
+│   ├── script.js               # Frontend JavaScript
+│   └── styles.css              # Styles
+├── .github/workflows/           # GitHub Actions
+│   └── deploy-worker.yml       # Auto-deploy worker on push
+└── server.js                    # Express backend
+```
+
 ## API Documentation
 
 ### Base URL
-- **Production**: `https://house-rules-acknowledgment-91bc2e7022ee.herokuapp.com`
+- **Production**: `https://shreeganeshkunj.com` or `https://house-rules-acknowledgment-91bc2e7022ee.herokuapp.com`
 - **Local Development**: `http://localhost:3000`
 
 ### Endpoints
