@@ -66,12 +66,19 @@ Each recurring customer (2+ visits) shows:
 
 **Interactive Features:**
 - **Click any customer card** to view complete booking history
-- Modal shows:
+- **Click any booking row** (in customer history or period view) to see full details
+- Customer History Modal shows:
   - Full customer details
-  - All bookings in table format (check-in, check-out, duration, guests)
+  - All bookings in clickable table format
   - Email used for each booking
   - Active/Completed status badges
   - Customer-specific average stay duration
+- Booking Details Modal shows:
+  - Complete primary guest information
+  - Emergency contact details
+  - All additional adult guests with IDs
+  - Booking dates and status
+  - Acknowledgment timestamp and IP address
 
 **Re-engagement Alerts:**
 - 🟢 **Green (Recent):** Last visit < 90 days - Happy customer
