@@ -27,12 +27,15 @@ Or access from the admin panel by clicking the "📊 Analytics Dashboard" button
   - Occupancy rate (%)
   - Days filled vs. total days
   - Number of bookings
+  - Average stay duration for the period
 
 **Use Cases:**
 - Identify peak and off-peak seasons
 - Compare year-over-year performance
 - Optimize pricing based on demand patterns
 - Plan maintenance during low-occupancy periods
+- Track trends in booking duration (weekend vs. long-term stays)
+- Adjust minimum stay requirements based on historical data
 
 ### 2. Recurring Customers Dashboard
 
@@ -47,6 +50,7 @@ Or access from the admin panel by clicking the "📊 Analytics Dashboard" button
 - Total unique customers (by govt ID)
 - Recurring customers count
 - Recurring rate percentage
+- Average stay duration across all bookings
 
 **Customer Cards Display:**
 Each recurring customer (2+ visits) shows:
@@ -59,6 +63,15 @@ Each recurring customer (2+ visits) shows:
 - Average days between visits
 - Total guests brought across all bookings
 - Re-engagement alert (color-coded)
+
+**Interactive Features:**
+- **Click any customer card** to view complete booking history
+- Modal shows:
+  - Full customer details
+  - All bookings in table format (check-in, check-out, duration, guests)
+  - Email used for each booking
+  - Active/Completed status badges
+  - Customer-specific average stay duration
 
 **Re-engagement Alerts:**
 - 🟢 **Green (Recent):** Last visit < 90 days - Happy customer
@@ -107,6 +120,7 @@ Returns occupancy data over time.
       "filledDays": 23,
       "totalDays": 31,
       "bookings": 3,
+      "avgStayDuration": 5,
       "periodStart": "2026-01-01",
       "periodEnd": "2026-01-31"
     }
@@ -123,7 +137,8 @@ Returns customer loyalty metrics grouped by government ID.
   "summary": {
     "totalRecurringCustomers": 15,
     "totalCustomers": 50,
-    "recurringRate": 30.0
+    "recurringRate": 30.0,
+    "avgStayDuration": 5
   },
   "customers": [
     {
