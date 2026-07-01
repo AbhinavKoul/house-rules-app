@@ -833,6 +833,7 @@
                                 <th>ID</th>
                                 <th>Name</th>
                                 <th>Email</th>
+                                <th>WhatsApp/Phone</th>
                                 <th>Check-In</th>
                                 <th>Check-Out</th>
                                 <th>Guests</th>
@@ -869,6 +870,7 @@
                             <td>${booking.id}</td>
                             <td>${booking.name}</td>
                             <td>${booking.email}</td>
+                            <td>${booking.whatsapp_number ? `<a href="https://wa.me/${booking.whatsapp_number.replace(/[^\d]/g, '')}" target="_blank">${booking.whatsapp_number}</a>` : '<span style="color:#999;">—</span>'}</td>
                             <td>${checkIn}</td>
                             <td>${checkOut}</td>
                             <td>${totalGuests} (${booking.number_of_guests}A, ${booking.number_of_children || 0}C)</td>
