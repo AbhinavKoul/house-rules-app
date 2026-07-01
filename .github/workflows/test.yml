@@ -1,4 +1,4 @@
-name: CI / Deploy
+name: CI
 
 on:
   push:
@@ -39,23 +39,5 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-
-  # Deploy to Heroku ONLY after tests pass, and only on push to main (not PRs).
-  deploy:
-    needs: test
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # full history so Heroku's git push is not rejected
-      - name: Deploy to Heroku
-        env:
-          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
-          HEROKU_APP_NAME: ${{ secrets.HEROKU_APP_NAME }}
-        run: |
-          if [ -z "$HEROKU_API_KEY" ] || [ -z "$HEROKU_APP_NAME" ]; then
-            echo "::notice::Heroku secrets not set (HEROKU_API_KEY / HEROKU_APP_NAME) — skipping auto-deploy. Deploy manually with 'git push heroku main'."
-            exit 0
-          fi
-          git push https://heroku:"$HEROKU_API_KEY"@git.heroku.com/"$HEROKU_APP_NAME".git HEAD:refs/heads/main -f
+      # Deploy is handled by Heroku's native GitHub integration
+      # ("Automatic deploys from main" + "Wait for CI to pass before deploy").

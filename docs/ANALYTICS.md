@@ -302,7 +302,7 @@ The table is created automatically on server startup (`initDB`).
 
 ## Testing
 
-Automated tests guard the customer/booking relationships so future changes can't silently break them. GitHub Actions runs them on every push and PR to `main` (`.github/workflows/test.yml`, with a Postgres service container). **Heroku is only deployed after tests pass** — see [CI-gated deploy](#ci-gated-heroku-deploy).
+Automated tests guard the customer/booking relationships so future changes can't silently break them. GitHub Actions runs them on every push and PR to `main` (`.github/workflows/test.yml`, with a Postgres service container). **Heroku is only deployed after tests pass** — see [CI-gated deploy](#ci-gated-heroku-deploy) below.
 
 - `npm run test:unit` — pure-logic tests, no database (`test_whatsapp.js` phone normalization, `test_earnings_proration.js` night-proration).
 - `npm run test:integration` — boots the Express app against a real Postgres and exercises the endpoints (`test/*.test.js`). Requires `DATABASE_URL` (and `HOST_KEY`).
@@ -320,13 +320,11 @@ DATABASE_URL="postgresql://localhost/house_rules_test" HOST_KEY="test-host-key" 
 
 ### CI-gated Heroku deploy
 
-The workflow has two jobs. `deploy` runs `needs: test` and `if: github.ref == 'refs/heads/main' && github.event_name == 'push'`, so **Heroku is only updated when the test job passes on a push to `main`** (PRs run tests but never deploy). If any test fails, the deploy job is skipped and prod stays on the last good release.
+Deployment uses **Heroku's native GitHub integration**, not a workflow job:
+- Heroku app → Deploy tab → "Automatic deploys from `main`" is enabled.
+- "**Wait for CI to pass before deploy**" is checked, so Heroku only releases a commit after the GitHub Actions `CI` workflow goes green on it.
 
-Requires two GitHub repo secrets:
-- `HEROKU_API_KEY` — from `heroku authorizations:create` (or the account's API key).
-- `HEROKU_APP_NAME` — the Heroku app name (e.g. `house-rules-acknowledgment`).
-
-Until these secrets are set, deploy the app manually with `git push heroku main` (still safe to do after watching CI go green).
+Net effect: push to `main` → GitHub runs the tests → if they pass, Heroku auto-deploys; if they fail, prod stays on the last good release. No `git push heroku main` and no Heroku API secrets in GitHub are needed.
 
 ## Data Export for Marketing Tools
 
