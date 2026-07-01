@@ -598,6 +598,13 @@
                                 <option value="normal">Normal</option>
                             </select>
                         </div>
+                        <div class="control-group">
+                            <label>View:</label>
+                            <select id="customerViewSelect" onchange="renderAllCustomers()">
+                                <option value="table">Table (compact)</option>
+                                <option value="cards">Cards (detailed)</option>
+                            </select>
+                        </div>
                     </div>
                     <div id="allCustomersGrid" class="customers-grid">
                         <div class="loading">Loading customers...</div>
@@ -1209,7 +1216,12 @@
             };
             list.sort(sorters[sortBy] || sorters.spent);
 
+            const view = document.getElementById('customerViewSelect').value;
+
             grid.textContent = '';
+            // Cards use the grid layout; table needs a plain block container.
+            grid.className = view === 'cards' ? 'customers-grid' : '';
+
             if (list.length === 0) {
                 const empty = document.createElement('div');
                 empty.className = 'loading';
@@ -1218,7 +1230,74 @@
                 return;
             }
 
-            list.forEach(c => grid.append(buildCustomerCard(c)));
+            if (view === 'cards') {
+                list.forEach(c => grid.append(buildCustomerCard(c)));
+            } else {
+                grid.append(buildCustomerTable(list));
+            }
+        }
+
+        // Compact row view. Values are textContent (safe); Edit opens the detailed card in a modal.
+        function buildCustomerTable(list) {
+            const table = document.createElement('table');
+            const thead = document.createElement('thead');
+            const headRow = document.createElement('tr');
+            ['Name', 'Status', 'Visits', 'Total Spent', 'Avg./Day', 'Last Visit', 'WhatsApp/Phone', ''].forEach(h => {
+                const th = document.createElement('th');
+                th.textContent = h;
+                headRow.append(th);
+            });
+            thead.append(headRow);
+            table.append(thead);
+
+            const tbody = document.createElement('tbody');
+            list.forEach(c => {
+                const tr = document.createElement('tr');
+                if (c.status === 'blacklisted') tr.style.background = 'rgba(220,53,69,0.08)';
+                else if (c.status === 'prospective') tr.style.background = 'rgba(40,167,69,0.08)';
+
+                const st = STATUS_STYLES[c.status] || STATUS_STYLES.normal;
+                const cells = [
+                    c.name || '(no name)',
+                    st.label,
+                    c.bookingCount,
+                    rupee(c.totalSpent),
+                    rupee(c.avgPerDay),
+                    new Date(c.lastVisit).toLocaleDateString(),
+                    c.whatsappNumber || '—'
+                ];
+                cells.forEach((val, i) => {
+                    const td = document.createElement('td');
+                    td.textContent = val;
+                    if (i === 1) td.style.color = st.color;
+                    tr.append(td);
+                });
+
+                const actionTd = document.createElement('td');
+                const editBtn = document.createElement('button');
+                editBtn.className = 'load-btn';
+                editBtn.style.cssText = 'padding: 4px 12px; font-size: 0.85em;';
+                editBtn.textContent = 'Edit';
+                editBtn.onclick = () => openCustomerEdit(c.govtIdNumber);
+                actionTd.append(editBtn);
+                tr.append(actionTd);
+                tbody.append(tr);
+            });
+            table.append(tbody);
+            return table;
+        }
+
+        // Open the editable card for a single customer in the shared modal.
+        function openCustomerEdit(govtIdNumber) {
+            const c = allCustomers.find(x => x.govtIdNumber === govtIdNumber);
+            if (!c) return;
+            const modal = document.getElementById('customerModal');
+            document.getElementById('modalCustomerName').textContent = `${c.name || 'Customer'} — Edit Profile`;
+            document.getElementById('modalCustomerDetails').textContent = '';
+            const history = document.getElementById('modalBookingHistory');
+            history.textContent = '';
+            history.append(buildCustomerCard(c));
+            modal.style.display = 'block';
         }
 
         const STATUS_STYLES = {
