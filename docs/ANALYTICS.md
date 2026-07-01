@@ -137,6 +137,8 @@ Each recurring customer (2+ visits) shows:
 
 **Filtering:** All / Prospective / Blacklisted / Normal.
 
+**Views:** Table (compact, default) for scanning many customers at once, or Cards (detailed) for inline editing. In Table view, the per-row **Edit** button opens the full editable card in a modal.
+
 **Editable per customer (saved to `customer_profiles`, keyed by govt ID):**
 - **WhatsApp/Phone:** One number per person. Defaults to their most recent booking's number; the host edit overrides it. Validated and normalized with the same +91 rule as the booking form (10-digit Indian numbers get `+91`; others must include a country code).
 - **Note:** Free-text "what we think about this guest".
