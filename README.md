@@ -269,7 +269,52 @@ Set `HOST_KEY` in your environment variables for authentication.
 
 ## Database Schema
 
-The application uses a single table to store acknowledgments:
+The application uses two tables. `acknowledgments` holds every booking (one row per stay);
+`customer_profiles` holds host-side data for a unique customer, keyed by government ID. They
+are linked logically by `govt_id_number` — a customer's many bookings map to at most one profile.
+
+### Entity-relationship diagram
+
+```mermaid
+erDiagram
+    acknowledgments ||--o| customer_profiles : "govt_id_number (logical link)"
+
+    acknowledgments {
+        serial id PK
+        varchar name
+        varchar email
+        date dob
+        varchar govt_id_type
+        varchar govt_id_number "customer identity"
+        varchar whatsapp_number "per-booking, historical"
+        numeric amount_received "host-set, feeds earnings"
+        int number_of_guests
+        int number_of_children
+        varchar relationship_type
+        jsonb additional_guests "adult guests + their govt IDs"
+        date check_in_date
+        date check_out_date
+        boolean cancelled
+        timestamp acknowledged_at
+        varchar ip_address
+    }
+
+    customer_profiles {
+        varchar govt_id_number PK "= acknowledgments.govt_id_number"
+        varchar whatsapp_number "backfill when a booking has none"
+        text note "host's private note"
+        varchar status "normal | prospective | blacklisted"
+        timestamp updated_at
+    }
+```
+
+**Relationship notes:**
+- **Customer identity is `govt_id_number`**, not email or name (guests may reuse neither reliably). One customer = many `acknowledgments` rows.
+- The link is **logical, not an FK** — a `customer_profiles` row exists only once the host adds a note/status or a number is backfilled, and bookings can exist with no profile.
+- **WhatsApp precedence** (Customers view): the most recent booking's `whatsapp_number` wins; `customer_profiles.whatsapp_number` is the fallback for bookings that never captured one. Every distinct number is preserved per-booking ("Numbers on record").
+- **Blacklist** (`customer_profiles.status = 'blacklisted'`) hard-blocks new bookings whose primary **or** additional guest matches that `govt_id_number`.
+
+### DDL
 
 ```sql
 CREATE TABLE acknowledgments (
@@ -279,6 +324,8 @@ CREATE TABLE acknowledgments (
   dob DATE NOT NULL,
   govt_id_type VARCHAR(50) NOT NULL,
   govt_id_number VARCHAR(100) NOT NULL,
+  whatsapp_number VARCHAR(20),
+  amount_received NUMERIC(10,2) DEFAULT 0,
   number_of_guests INTEGER DEFAULT 1,
   number_of_children INTEGER DEFAULT 0,
   relationship_type VARCHAR(50),
@@ -294,6 +341,15 @@ CREATE TABLE acknowledgments (
 CREATE UNIQUE INDEX unique_active_booking_dates
 ON acknowledgments (check_in_date, check_out_date)
 WHERE cancelled = FALSE;
+
+-- Host-side customer data, keyed by government ID (linked to acknowledgments.govt_id_number)
+CREATE TABLE customer_profiles (
+  govt_id_number VARCHAR(100) PRIMARY KEY,
+  whatsapp_number VARCHAR(20),
+  note TEXT,
+  status VARCHAR(20) DEFAULT 'normal',
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 ```
 
 ## Heroku Deployment
