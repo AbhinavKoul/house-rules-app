@@ -488,6 +488,7 @@
             <div class="nav-tabs">
                 <button class="nav-tab active" onclick="switchTab('occupancy')">Occupancy Trends</button>
                 <button class="nav-tab" onclick="switchTab('earnings')">Earnings</button>
+                <button class="nav-tab" onclick="switchTab('allCustomers')">Customers</button>
                 <button class="nav-tab" onclick="switchTab('customers')">Recurring Customers</button>
             </div>
 
@@ -574,6 +575,36 @@
                 </div>
             </div>
 
+            <!-- All Customers Dashboard -->
+            <div id="allCustomersDashboard" class="dashboard-section">
+                <div class="chart-container">
+                    <div class="chart-controls">
+                        <div class="control-group">
+                            <label>Sort by:</label>
+                            <select id="customerSortSelect" onchange="renderAllCustomers()">
+                                <option value="spent">Total Spent (high → low)</option>
+                                <option value="perday">Avg. per Day (high → low)</option>
+                                <option value="visits">Visits (most first)</option>
+                                <option value="recent">Most Recent Visit</option>
+                                <option value="name">Name (A → Z)</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label>Show:</label>
+                            <select id="customerFilterSelect" onchange="renderAllCustomers()">
+                                <option value="all">All</option>
+                                <option value="prospective">Prospective</option>
+                                <option value="blacklisted">Blacklisted</option>
+                                <option value="normal">Normal</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="allCustomersGrid" class="customers-grid">
+                        <div class="loading">Loading customers...</div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Recurring Customers Dashboard -->
             <div id="customersDashboard" class="dashboard-section">
                 <div class="summary-cards">
@@ -637,6 +668,7 @@
         let occupancyData = [];
         let earningsChart = null;
         let allBookings = []; // Cache all bookings for quick lookup
+        let allCustomers = []; // Cache unique customers for the Customers tab
 
         async function loadDashboard() {
             hostKey = document.getElementById('hostKey').value.trim();
@@ -1144,6 +1176,195 @@
             container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
 
+        // ---- All Customers tab ----
+        async function loadAllCustomers() {
+            const grid = document.getElementById('allCustomersGrid');
+            try {
+                const response = await fetch('/api/statistics/customers', {
+                    headers: { 'X-Host-Key': hostKey }
+                });
+                const result = await response.json();
+                allCustomers = result.customers || [];
+                renderAllCustomers();
+            } catch (error) {
+                console.error('Error loading customers:', error);
+                grid.textContent = 'Error loading customers';
+            }
+        }
+
+        function renderAllCustomers() {
+            const grid = document.getElementById('allCustomersGrid');
+            const sortBy = document.getElementById('customerSortSelect').value;
+            const filter = document.getElementById('customerFilterSelect').value;
+
+            let list = allCustomers.slice();
+            if (filter !== 'all') list = list.filter(c => c.status === filter);
+
+            const sorters = {
+                spent: (a, b) => b.totalSpent - a.totalSpent,
+                perday: (a, b) => b.avgPerDay - a.avgPerDay,
+                visits: (a, b) => b.bookingCount - a.bookingCount,
+                recent: (a, b) => new Date(b.lastVisit) - new Date(a.lastVisit),
+                name: (a, b) => (a.name || '').localeCompare(b.name || '')
+            };
+            list.sort(sorters[sortBy] || sorters.spent);
+
+            grid.textContent = '';
+            if (list.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'loading';
+                empty.textContent = 'No customers match this filter';
+                grid.append(empty);
+                return;
+            }
+
+            list.forEach(c => grid.append(buildCustomerCard(c)));
+        }
+
+        const STATUS_STYLES = {
+            normal: { label: 'Normal', color: '#6c757d' },
+            prospective: { label: '⭐ Prospective', color: '#28a745' },
+            blacklisted: { label: '🚫 Blacklisted', color: '#dc3545' }
+        };
+
+        function buildCustomerCard(c) {
+            const card = document.createElement('div');
+            card.className = 'customer-card';
+            if (c.status === 'blacklisted') card.style.borderLeft = '4px solid #dc3545';
+            else if (c.status === 'prospective') card.style.borderLeft = '4px solid #28a745';
+
+            // Header: name + status badge
+            const header = document.createElement('div');
+            header.className = 'customer-header';
+            const left = document.createElement('div');
+            const nameEl = document.createElement('div');
+            nameEl.className = 'customer-name';
+            nameEl.textContent = c.name || '(no name)';
+            const emailEl = document.createElement('div');
+            emailEl.className = 'customer-email';
+            emailEl.textContent = c.email || '';
+            const idEl = document.createElement('div');
+            idEl.style.cssText = 'font-size: 0.85em; color: #999; margin-top: 3px;';
+            idEl.textContent = `${c.govtIdType}: ${c.govtIdNumber}`;
+            left.append(nameEl, emailEl, idEl);
+
+            const badge = document.createElement('div');
+            const st = STATUS_STYLES[c.status] || STATUS_STYLES.normal;
+            badge.className = 'visit-badge';
+            badge.style.background = st.color;
+            badge.textContent = st.label;
+            header.append(left, badge);
+            card.append(header);
+
+            // Stats grid
+            const stats = document.createElement('div');
+            stats.className = 'customer-stats';
+            const statItems = [
+                ['Visits', c.bookingCount],
+                ['Total Spent', rupee(c.totalSpent)],
+                ['Avg. per Day', rupee(c.avgPerDay)],
+                ['Last Visit', new Date(c.lastVisit).toLocaleDateString()]
+            ];
+            statItems.forEach(([label, value]) => {
+                const item = document.createElement('div');
+                item.className = 'stat-item';
+                const l = document.createElement('div');
+                l.className = 'stat-label';
+                l.textContent = label;
+                const v = document.createElement('div');
+                v.className = 'stat-value';
+                v.textContent = value;
+                item.append(l, v);
+                stats.append(item);
+            });
+            card.append(stats);
+
+            // Editable controls: WhatsApp, note, status, save
+            const controls = document.createElement('div');
+            controls.style.cssText = 'margin-top: 12px; display: flex; flex-direction: column; gap: 8px;';
+
+            const waLabel = document.createElement('label');
+            waLabel.style.cssText = 'font-size: 0.8em; color: #666;';
+            waLabel.textContent = 'WhatsApp/Phone';
+            const waInput = document.createElement('input');
+            waInput.type = 'tel';
+            waInput.value = c.whatsappNumber || '';
+            waInput.placeholder = 'e.g. +91 9876543210';
+            waInput.style.cssText = 'padding: 6px; border: 1px solid #ccc; border-radius: 4px; width: 100%;';
+
+            const noteLabel = document.createElement('label');
+            noteLabel.style.cssText = 'font-size: 0.8em; color: #666;';
+            noteLabel.textContent = 'Note (our view of this guest)';
+            const noteInput = document.createElement('textarea');
+            noteInput.value = c.note || '';
+            noteInput.rows = 2;
+            noteInput.placeholder = 'e.g. Quiet, respectful, left place clean';
+            noteInput.style.cssText = 'padding: 6px; border: 1px solid #ccc; border-radius: 4px; width: 100%; resize: vertical; font-family: inherit;';
+
+            const statusRow = document.createElement('div');
+            statusRow.style.cssText = 'display: flex; align-items: center; gap: 8px; flex-wrap: wrap;';
+            const statusLabel = document.createElement('label');
+            statusLabel.style.cssText = 'font-size: 0.8em; color: #666;';
+            statusLabel.textContent = 'Status';
+            const statusSelect = document.createElement('select');
+            statusSelect.style.cssText = 'padding: 6px; border: 1px solid #ccc; border-radius: 4px;';
+            [['normal', 'Normal'], ['prospective', 'Prospective client'], ['blacklisted', 'Blacklist']].forEach(([val, txt]) => {
+                const opt = document.createElement('option');
+                opt.value = val;
+                opt.textContent = txt;
+                if (c.status === val) opt.selected = true;
+                statusSelect.append(opt);
+            });
+            statusRow.append(statusLabel, statusSelect);
+
+            const saveBtn = document.createElement('button');
+            saveBtn.className = 'load-btn';
+            saveBtn.style.cssText = 'padding: 8px; margin-top: 4px;';
+            saveBtn.textContent = 'Save';
+            saveBtn.onclick = () => saveCustomerProfile(c.govtIdNumber, {
+                whatsappNumber: waInput.value.trim(),
+                note: noteInput.value.trim(),
+                status: statusSelect.value
+            }, saveBtn);
+
+            controls.append(waLabel, waInput, noteLabel, noteInput, statusRow, saveBtn);
+            card.append(controls);
+
+            return card;
+        }
+
+        async function saveCustomerProfile(govtIdNumber, fields, btn) {
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+            try {
+                const response = await fetch('/api/update-customer-profile', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ govtIdNumber, ...fields, hostKey })
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    showMessage('Customer profile saved', 'success');
+                    // Update local cache so re-sort/filter reflects the change
+                    const cust = allCustomers.find(c => c.govtIdNumber === govtIdNumber);
+                    if (cust) {
+                        cust.whatsappNumber = result.data.whatsapp_number || cust.whatsappNumber;
+                        cust.note = result.data.note || '';
+                        cust.status = result.data.status;
+                    }
+                    renderAllCustomers();
+                } else {
+                    showMessage(result.error || 'Failed to save profile', 'error');
+                }
+            } catch (error) {
+                console.error('Error saving profile:', error);
+                showMessage('Network error. Please try again.', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Save';
+            }
+        }
+
         function switchTab(tab) {
             // Update tab buttons
             document.querySelectorAll('.nav-tab').forEach(btn => btn.classList.remove('active'));
@@ -1159,6 +1380,9 @@
             } else if (tab === 'earnings') {
                 document.getElementById('earningsDashboard').classList.add('active');
                 renderEarnings();
+            } else if (tab === 'allCustomers') {
+                document.getElementById('allCustomersDashboard').classList.add('active');
+                loadAllCustomers();
             } else if (tab === 'customers') {
                 document.getElementById('customersDashboard').classList.add('active');
             }

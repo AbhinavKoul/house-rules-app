@@ -129,11 +129,24 @@ const initDB = async () => {
     WHERE cancelled = FALSE;
   `;
 
+  // Customer-level profile keyed by government ID (identity used across recurring-customer logic).
+  // status: 'normal' | 'prospective' | 'blacklisted'
+  const createCustomerProfilesQuery = `
+    CREATE TABLE IF NOT EXISTS customer_profiles (
+      govt_id_number VARCHAR(100) PRIMARY KEY,
+      whatsapp_number VARCHAR(20),
+      note TEXT,
+      status VARCHAR(20) DEFAULT 'normal',
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `;
+
   try {
     await pool.query(createTableQuery);
     await pool.query(alterTableQuery);
     await pool.query(dropEmailConstraintQuery);
     await pool.query(createUniqueIndexQuery);
+    await pool.query(createCustomerProfilesQuery);
     console.log('Database table initialized successfully');
   } catch (err) {
     console.error('Error initializing database:', err);
@@ -238,6 +251,16 @@ app.post('/api/acknowledge', async (req, res) => {
   const ipAddress = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
 
   try {
+    // Block blacklisted guests (primary or any additional adult) by government ID.
+    const guestIds = [govtIdNumber, ...(Array.isArray(additionalGuests) ? additionalGuests.map(g => g.govtIdNumber) : [])];
+    const blacklistResult = await pool.query(
+      `SELECT govt_id_number FROM customer_profiles WHERE status = 'blacklisted' AND govt_id_number = ANY($1)`,
+      [guestIds]
+    );
+    if (blacklistResult.rows.length > 0) {
+      return res.status(403).json({ error: 'This booking cannot be completed. Please contact the host directly.' });
+    }
+
     // Check for overlapping bookings
     const overlapQuery = `
       SELECT id FROM acknowledgments
@@ -934,6 +957,114 @@ app.get('/api/statistics/recurring-customers', async (req, res) => {
   } catch (err) {
     console.error('Database error:', err);
     res.status(500).json({ error: 'Failed to fetch recurring customer statistics' });
+  }
+});
+
+// Get all unique customers (grouped by government ID) with profile data
+app.get('/api/statistics/customers', async (req, res) => {
+  const hostKey = req.headers['x-host-key'];
+
+  if (!hostKey || hostKey !== process.env.HOST_KEY) {
+    return res.status(403).json({ error: 'Unauthorized: Invalid or missing host key' });
+  }
+
+  try {
+    // One row per unique customer (by govt ID), joined with their editable profile.
+    // whatsapp falls back to the most recent booking's number when no profile override exists.
+    const query = `
+      SELECT
+        a.govt_id_number,
+        a.govt_id_type,
+        (ARRAY_AGG(a.name ORDER BY a.check_in_date DESC))[1] as name,
+        (ARRAY_AGG(a.email ORDER BY a.check_in_date DESC))[1] as email,
+        (ARRAY_AGG(a.whatsapp_number ORDER BY a.check_in_date DESC))[1] as booking_whatsapp,
+        COUNT(*) as booking_count,
+        MIN(a.check_in_date) as first_visit,
+        MAX(a.check_out_date) as last_visit,
+        SUM(COALESCE(a.amount_received, 0)) as total_spent,
+        SUM((a.check_out_date - a.check_in_date)) as total_nights,
+        p.whatsapp_number as profile_whatsapp,
+        p.note,
+        COALESCE(p.status, 'normal') as status
+      FROM acknowledgments a
+      LEFT JOIN customer_profiles p ON p.govt_id_number = a.govt_id_number
+      WHERE a.cancelled = FALSE
+      GROUP BY a.govt_id_number, a.govt_id_type, p.whatsapp_number, p.note, p.status
+      ORDER BY SUM(COALESCE(a.amount_received, 0)) DESC
+    `;
+
+    const result = await pool.query(query);
+
+    const customers = result.rows.map(c => {
+      const totalNights = parseInt(c.total_nights) || 0;
+      const totalSpent = parseFloat(c.total_spent || 0);
+      return {
+        govtIdNumber: c.govt_id_number,
+        govtIdType: c.govt_id_type,
+        name: c.name,
+        email: c.email,
+        whatsappNumber: c.profile_whatsapp || c.booking_whatsapp || '',
+        bookingCount: parseInt(c.booking_count),
+        firstVisit: c.first_visit,
+        lastVisit: c.last_visit,
+        totalSpent,
+        totalNights,
+        avgPerDay: totalNights > 0 ? totalSpent / totalNights : 0,
+        note: c.note || '',
+        status: c.status
+      };
+    });
+
+    res.json({ customers });
+  } catch (err) {
+    console.error('Database error:', err);
+    res.status(500).json({ error: 'Failed to fetch customers' });
+  }
+});
+
+// Upsert a customer profile (whatsapp / note / status), admin only
+app.post('/api/update-customer-profile', async (req, res) => {
+  const { govtIdNumber, whatsappNumber, note, status, hostKey } = req.body;
+
+  if (!hostKey || hostKey !== process.env.HOST_KEY) {
+    return res.status(403).json({ error: 'Unauthorized: Invalid or missing host key' });
+  }
+
+  if (!govtIdNumber) {
+    return res.status(400).json({ error: 'Government ID number is required' });
+  }
+
+  const validStatuses = ['normal', 'prospective', 'blacklisted'];
+  if (status !== undefined && !validStatuses.includes(status)) {
+    return res.status(400).json({ error: 'Invalid status' });
+  }
+
+  // Normalize whatsapp only if provided (empty string clears it)
+  let normalizedWhatsapp = null;
+  if (whatsappNumber) {
+    normalizedWhatsapp = normalizeWhatsappNumber(whatsappNumber);
+    if (!normalizedWhatsapp) {
+      return res.status(400).json({ error: 'Please enter a valid WhatsApp number (10 digits for India, or include a country code like +1...)' });
+    }
+  }
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO customer_profiles (govt_id_number, whatsapp_number, note, status, updated_at)
+       VALUES ($1, $2, $3, COALESCE($4, 'normal'), CURRENT_TIMESTAMP)
+       ON CONFLICT (govt_id_number) DO UPDATE SET
+         whatsapp_number = EXCLUDED.whatsapp_number,
+         note = EXCLUDED.note,
+         status = COALESCE($4, customer_profiles.status),
+         updated_at = CURRENT_TIMESTAMP
+       RETURNING govt_id_number, whatsapp_number, note, status`,
+      [govtIdNumber, normalizedWhatsapp, note || null, status || null]
+    );
+
+    res.json({ success: true, message: 'Customer profile updated', data: result.rows[0] });
+  } catch (err) {
+    console.error('Database error:', err);
+    res.status(500).json({ error: 'Failed to update customer profile' });
   }
 });
 
