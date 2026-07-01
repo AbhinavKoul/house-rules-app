@@ -3,6 +3,7 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
 const { Pool } = require('pg');
+const { normalizeWhatsappNumber } = require('./whatsapp');
 require('dotenv').config();
 
 const app = express();
@@ -155,10 +156,10 @@ app.post('/api/acknowledge', async (req, res) => {
     return res.status(400).json({ error: 'All fields are required' });
   }
 
-  // Validate WhatsApp phone format
-  const whatsappClean = whatsappNumber.replace(/[\s\-]/g, '');
-  if (!/^\+?\d{7,15}$/.test(whatsappClean)) {
-    return res.status(400).json({ error: 'Please enter a valid WhatsApp number (7-15 digits)' });
+  // Normalize WhatsApp number: default to +91 for a 10-digit Indian number.
+  const normalizedWhatsapp = normalizeWhatsappNumber(whatsappNumber);
+  if (!normalizedWhatsapp) {
+    return res.status(400).json({ error: 'Please enter a valid WhatsApp number (10 digits for India, or include a country code like +1...)' });
   }
 
   // Validate emergency contact fields
@@ -266,7 +267,7 @@ app.post('/api/acknowledge', async (req, res) => {
       dob,
       govtIdType,
       govtIdNumber,
-      whatsappNumber,
+      normalizedWhatsapp,
       numGuests,
       numChildren,
       totalPeople > 1 ? relationshipType : null,

@@ -265,9 +265,13 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Validate WhatsApp number
-        if (!validatePhone(formData.whatsappNumber)) {
-            showMessage('Please enter a valid WhatsApp number (7-15 digits, may include + prefix).', 'error');
+        // Validate WhatsApp number (10 digits for India, or include a country code)
+        const whatsappClean = formData.whatsappNumber.replace(/[\s\-]/g, '');
+        const whatsappValid = whatsappClean.startsWith('+')
+            ? /^\+\d{7,15}$/.test(whatsappClean)
+            : /^\d{10}$/.test(whatsappClean);
+        if (!whatsappValid) {
+            showMessage('Please enter a valid WhatsApp number: 10 digits for India, or include a country code like +1...', 'error');
             return;
         }
 
