@@ -147,6 +147,12 @@ const initDB = async () => {
     await pool.query(dropEmailConstraintQuery);
     await pool.query(createUniqueIndexQuery);
     await pool.query(createCustomerProfilesQuery);
+    // Seed a test blacklisted ID (000000000) for verifying the block in prod.
+    await pool.query(
+      `INSERT INTO customer_profiles (govt_id_number, note, status)
+       VALUES ('000000000', 'Test blacklist ID', 'blacklisted')
+       ON CONFLICT (govt_id_number) DO NOTHING`
+    );
     console.log('Database table initialized successfully');
   } catch (err) {
     console.error('Error initializing database:', err);
