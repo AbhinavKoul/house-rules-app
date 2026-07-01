@@ -328,7 +328,14 @@ app.get('/api/acknowledgments', async (req, res) => {
 
   try {
     const result = await pool.query(
-      'SELECT id, name, email, dob, govt_id_type, govt_id_number, whatsapp_number, amount_received, number_of_guests, number_of_children, relationship_type, additional_guests, check_in_date, check_out_date, cancelled, acknowledged_at, ip_address, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship FROM acknowledgments ORDER BY check_in_date DESC'
+      `SELECT a.id, a.name, a.email, a.dob, a.govt_id_type, a.govt_id_number,
+              COALESCE(a.whatsapp_number, p.whatsapp_number) as whatsapp_number,
+              a.amount_received, a.number_of_guests, a.number_of_children, a.relationship_type,
+              a.additional_guests, a.check_in_date, a.check_out_date, a.cancelled, a.acknowledged_at,
+              a.ip_address, a.emergency_contact_name, a.emergency_contact_phone, a.emergency_contact_relationship
+       FROM acknowledgments a
+       LEFT JOIN customer_profiles p ON p.govt_id_number = a.govt_id_number
+       ORDER BY a.check_in_date DESC`
     );
     res.json(result.rows);
   } catch (err) {
