@@ -1557,6 +1557,36 @@
             waMsgBtn.onclick = () => messageOnWhatsApp(waInput.value);
             waRow.append(waInput, waMsgBtn);
 
+            // All distinct numbers this customer has used across bookings (history is preserved
+            // per-booking even when the single profile number above is updated to a new one).
+            const norm = (n) => (n || '').replace(/[^\d]/g, '');
+            const seen = new Set();
+            const pastNumbers = [];
+            allBookings
+                .filter(b => b.govt_id_number === c.govtIdNumber && b.whatsapp_number)
+                .forEach(b => {
+                    const key = norm(b.whatsapp_number);
+                    if (key && !seen.has(key)) { seen.add(key); pastNumbers.push(b.whatsapp_number); }
+                });
+            let numbersBlock = null;
+            if (pastNumbers.length > 1 || (pastNumbers.length === 1 && norm(pastNumbers[0]) !== norm(c.whatsappNumber))) {
+                numbersBlock = document.createElement('div');
+                numbersBlock.style.cssText = 'font-size: 0.8em; color: #666;';
+                const lbl = document.createElement('div');
+                lbl.textContent = `Numbers on record (${pastNumbers.length}):`;
+                lbl.style.marginBottom = '4px';
+                numbersBlock.append(lbl);
+                pastNumbers.forEach(n => {
+                    const link = document.createElement('a');
+                    link.href = `https://wa.me/${norm(n)}`;
+                    link.target = '_blank';
+                    link.rel = 'noopener';
+                    link.textContent = n;
+                    link.style.cssText = 'display: inline-block; margin-right: 12px;';
+                    numbersBlock.append(link);
+                });
+            }
+
             const noteLabel = document.createElement('label');
             noteLabel.style.cssText = 'font-size: 0.8em; color: #666;';
             noteLabel.textContent = 'Note (our view of this guest)';
@@ -1592,7 +1622,9 @@
                 status: statusSelect.value
             }, saveBtn);
 
-            controls.append(waLabel, waRow, noteLabel, noteInput, statusRow, saveBtn);
+            controls.append(waLabel, waRow);
+            if (numbersBlock) controls.append(numbersBlock);
+            controls.append(noteLabel, noteInput, statusRow, saveBtn);
             card.append(controls);
 
             return card;

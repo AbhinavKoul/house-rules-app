@@ -151,7 +151,8 @@ Each recurring customer (2+ visits) shows:
 Visits are read from the cached bookings (`/api/acknowledgments`) filtered by government ID, cancelled excluded — no extra endpoint.
 
 **Editable per customer (saved to `customer_profiles`, keyed by govt ID):**
-- **WhatsApp/Phone:** One number per person. Defaults to their most recent booking's number; the host edit overrides it. Validated and normalized with the same +91 rule as the booking form (10-digit Indian numbers get `+91`; others must include a country code).
+- **WhatsApp/Phone:** One number per person. Defaults to their most recent booking's number; the host edit overrides it. Validated and normalized with the same +91 rule as the booking form (10-digit Indian numbers get `+91`; others must include a country code). A green **Message** button opens a WhatsApp chat for that number (in the customer table row and profile card).
+- **Numbers on record:** Every distinct number the customer has used across bookings is preserved per-booking (a profile update never overwrites past bookings' numbers). When a customer has used more than one number, the profile card lists them all as clickable `wa.me` links, so old numbers remain reachable even after updating the single profile number to a new one.
 - **Note:** Free-text "what we think about this guest".
 - **Status (single value):** `normal` | `prospective` | `blacklisted`. Green border for prospective, red for blacklisted.
 
