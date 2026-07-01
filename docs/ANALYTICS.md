@@ -302,7 +302,7 @@ The table is created automatically on server startup (`initDB`).
 
 ## Testing
 
-Automated tests guard the customer/booking relationships so future changes can't silently break them. GitHub Actions runs them on every push and PR to `main` (`.github/workflows/test.yml`, with a Postgres service container).
+Automated tests guard the customer/booking relationships so future changes can't silently break them. GitHub Actions runs them on every push and PR to `main` (`.github/workflows/test.yml`, with a Postgres service container). **Heroku is only deployed after tests pass** — see [CI-gated deploy](#ci-gated-heroku-deploy).
 
 - `npm run test:unit` — pure-logic tests, no database (`test_whatsapp.js` phone normalization, `test_earnings_proration.js` night-proration).
 - `npm run test:integration` — boots the Express app against a real Postgres and exercises the endpoints (`test/*.test.js`). Requires `DATABASE_URL` (and `HOST_KEY`).
@@ -314,7 +314,19 @@ createdb house_rules_test
 DATABASE_URL="postgresql://localhost/house_rules_test" HOST_KEY="test-host-key" npm test
 ```
 
-**Relationships covered:** +91 phone normalization + invalid-number rejection, blacklist block (primary **and** additional guests, neutral 403 that never reveals the reason), prospective guests can still book, date-overlap 409, WhatsApp display precedence (booking number wins, profile fills the gap), profile upsert preserving the number when note/status is saved, customers linked by govt ID with the newest booking number winning, host-key protection, and amount → total-spent aggregation.
+**Relationships covered** (`test/relationships.test.js`): +91 phone normalization + invalid-number rejection, blacklist block (primary **and** additional guests, neutral 403 that never reveals the reason), prospective guests can still book, date-overlap 409, WhatsApp display precedence (booking number wins, profile fills the gap), profile upsert preserving the number when note/status is saved, customers linked by govt ID with the newest booking number winning, host-key protection, and amount → total-spent aggregation.
+
+**Endpoint behaviors covered** (`test/endpoints.test.js`): form validation (missing fields, past/invalid dates, bad email, relationship-type requirement, mismatched guest count, bad emergency phone); `blocked-dates` excludes cancelled; cancellation (auth, 404, frees dates for rebooking); host edits (`update-govt-id`, `update-dob` under-18 guard, `update-check-in-date` past-date guard, no edits on cancelled bookings, `update-check-out-date` extension); recurring-customers (2+ visits only, multi-email flag, cancelled excluded); occupancy stats (auth + period count); customers feed excludes fully-cancelled customers.
+
+### CI-gated Heroku deploy
+
+The workflow has two jobs. `deploy` runs `needs: test` and `if: github.ref == 'refs/heads/main' && github.event_name == 'push'`, so **Heroku is only updated when the test job passes on a push to `main`** (PRs run tests but never deploy). If any test fails, the deploy job is skipped and prod stays on the last good release.
+
+Requires two GitHub repo secrets:
+- `HEROKU_API_KEY` — from `heroku authorizations:create` (or the account's API key).
+- `HEROKU_APP_NAME` — the Heroku app name (e.g. `house-rules-acknowledgment`).
+
+Until these secrets are set, deploy the app manually with `git push heroku main` (still safe to do after watching CI go green).
 
 ## Data Export for Marketing Tools
 
