@@ -480,18 +480,45 @@
                 padding: 12px;
             }
 
-            /* Let wide tables scroll instead of crushing their columns */
-            .bookings-for-period,
-            #earningsPeriodTable {
-                overflow-x: auto;
+            /* Full-width stacked controls so selects are easy to tap */
+            .control-group {
+                width: 100%;
             }
 
-            .bookings-for-period table {
+            .control-group select {
+                flex: 1;
+                width: 100%;
+            }
+
+            /* Let every wide table scroll instead of crushing its columns */
+            .bookings-for-period,
+            #periodBookingsTable,
+            #earningsPeriodTable,
+            #allCustomersGrid,
+            .booking-history-table {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            table {
                 min-width: 480px;
             }
 
             th, td {
                 padding: 8px;
+                white-space: nowrap;
+            }
+
+            .modal-content {
+                width: 95%;
+                margin: 8% auto;
+                padding: 18px;
+                max-height: 88vh;
+            }
+
+            .detail-row {
+                grid-template-columns: 1fr;
+                gap: 4px;
             }
         }
     </style>
