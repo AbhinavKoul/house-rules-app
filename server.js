@@ -832,12 +832,14 @@ app.get('/api/statistics/recurring-customers', async (req, res) => {
         MIN(check_in_date) as first_visit,
         MAX(check_out_date) as last_visit,
         SUM(number_of_guests + COALESCE(number_of_children, 0)) as total_guests_brought,
+        SUM(COALESCE(amount_received, 0)) as total_spent,
         ARRAY_AGG(
           json_build_object(
             'id', id,
             'check_in', check_in_date,
             'check_out', check_out_date,
             'guests', number_of_guests + COALESCE(number_of_children, 0),
+            'amount', COALESCE(amount_received, 0),
             'email', email,
             'name', name
           ) ORDER BY check_in_date
@@ -896,6 +898,7 @@ app.get('/api/statistics/recurring-customers', async (req, res) => {
         daysSinceFirstVisit: daysSinceFirst,
         avgDaysBetweenVisits,
         totalGuestsBrought: parseInt(customer.total_guests_brought),
+        totalSpent: parseFloat(customer.total_spent || 0),
         bookings: customer.bookings
       };
     });

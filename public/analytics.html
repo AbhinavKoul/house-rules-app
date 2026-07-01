@@ -918,6 +918,10 @@
                                 <div class="stat-label">Total Guests</div>
                                 <div class="stat-value">${customer.totalGuestsBrought}</div>
                             </div>
+                            <div class="stat-item">
+                                <div class="stat-label">Total Spent</div>
+                                <div class="stat-value">${rupee(customer.totalSpent)}</div>
+                            </div>
                         </div>
                         <div class="last-visit-alert ${alertClass}">
                             ${alertText}
@@ -1193,6 +1197,7 @@
                             <th>Check-Out</th>
                             <th>Duration</th>
                             <th>Guests</th>
+                            <th>Amount</th>
                             <th>Email Used</th>
                             <th>Status</th>
                         </tr>
@@ -1206,6 +1211,8 @@
                 const duration = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
                 const status = checkOut < new Date() ? 'completed' : 'active';
                 const statusText = status === 'active' ? 'Active' : 'Completed';
+                const amt = parseFloat(booking.amount || 0);
+                const amtCell = amt > 0 ? rupee(amt) : '<span style="color: #dc3545;">Not recorded</span>';
 
                 tableHtml += `
                     <tr class="clickable-row" onclick="viewBookingDetails(${booking.id})">
@@ -1214,6 +1221,7 @@
                         <td>${checkOut.toLocaleDateString()}</td>
                         <td>${duration} days</td>
                         <td>${booking.guests}</td>
+                        <td>${amtCell}</td>
                         <td style="font-size: 0.85em;">${booking.email}</td>
                         <td><span class="booking-status-badge ${status}">${statusText}</span></td>
                     </tr>
@@ -1230,10 +1238,16 @@
             }, 0);
             const avgDuration = Math.round(totalDays / customer.bookings.length);
 
+            // Spend metrics: total across stays and average per night stayed.
+            const totalSpent = customer.bookings.reduce((sum, b) => sum + parseFloat(b.amount || 0), 0);
+            const avgPerDay = totalDays > 0 ? totalSpent / totalDays : 0;
+
             tableHtml = `
                 <div style="background: #e3f2fd; padding: 10px; border-radius: 6px; margin-bottom: 15px; text-align: center;">
                     <strong>Average Stay Duration:</strong> ${avgDuration} days |
-                    <strong>Total Days Stayed:</strong> ${totalDays} days
+                    <strong>Total Days Stayed:</strong> ${totalDays} days |
+                    <strong>Total Spent:</strong> ${rupee(totalSpent)} |
+                    <strong>Avg. per Day:</strong> ${rupee(avgPerDay)}
                 </div>
             ` + tableHtml;
 
