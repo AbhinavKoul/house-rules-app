@@ -836,6 +836,7 @@
                                 <th>Check-In</th>
                                 <th>Check-Out</th>
                                 <th>Guests</th>
+                                <th>Amount</th>
                                 <th>Status</th>
                                 <th>Action</th>
                             </tr>
@@ -871,6 +872,7 @@
                             <td>${checkIn}</td>
                             <td>${checkOut}</td>
                             <td>${totalGuests} (${booking.number_of_guests}A, ${booking.number_of_children || 0}C)</td>
+                            <td>${parseFloat(booking.amount_received) > 0 ? '₹' + parseFloat(booking.amount_received).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '<span style="color:#dc3545;">Not recorded</span>'}</td>
                             <td class="${statusClass}">${status}</td>
                             <td>
                                 <button class="view-btn" onclick="viewBookingDetails(${booking.id})">View</button>
