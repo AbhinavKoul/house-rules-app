@@ -1350,8 +1350,7 @@
                     c.bookingCount,
                     rupee(c.totalSpent),
                     rupee(c.avgPerDay),
-                    new Date(c.lastVisit).toLocaleDateString(),
-                    c.whatsappNumber || '—'
+                    new Date(c.lastVisit).toLocaleDateString()
                 ];
                 tr.className = 'clickable-row';
                 tr.onclick = () => openCustomerEdit(c.govtIdNumber);
@@ -1362,6 +1361,22 @@
                     if (i === 1) td.style.color = st.color;
                     tr.append(td);
                 });
+
+                // WhatsApp cell: number + Message button (opens chat)
+                const waTd = document.createElement('td');
+                if (c.whatsappNumber) {
+                    const numSpan = document.createElement('span');
+                    numSpan.textContent = c.whatsappNumber;
+                    const msgBtn = document.createElement('button');
+                    msgBtn.className = 'load-btn';
+                    msgBtn.style.cssText = 'padding: 3px 10px; font-size: 0.8em; margin-left: 8px; background: #25D366;';
+                    msgBtn.textContent = 'Message';
+                    msgBtn.onclick = (e) => { e.stopPropagation(); messageOnWhatsApp(c.whatsappNumber); };
+                    waTd.append(numSpan, msgBtn);
+                } else {
+                    waTd.textContent = '—';
+                }
+                tr.append(waTd);
 
                 const actionTd = document.createElement('td');
                 const editBtn = document.createElement('button');
@@ -1456,6 +1471,13 @@
             blacklisted: { label: '🚫 Blacklisted', color: '#dc3545' }
         };
 
+        // Open a WhatsApp chat for a number (strips non-digits). No-op if empty.
+        function messageOnWhatsApp(number) {
+            const digits = (number || '').replace(/[^\d]/g, '');
+            if (!digits) return;
+            window.open(`https://wa.me/${digits}`, '_blank', 'noopener');
+        }
+
         function buildCustomerCard(c) {
             const card = document.createElement('div');
             card.className = 'customer-card';
@@ -1520,11 +1542,20 @@
             const waLabel = document.createElement('label');
             waLabel.style.cssText = 'font-size: 0.8em; color: #666;';
             waLabel.textContent = 'WhatsApp/Phone';
+            const waRow = document.createElement('div');
+            waRow.style.cssText = 'display: flex; gap: 8px;';
             const waInput = document.createElement('input');
             waInput.type = 'tel';
             waInput.value = c.whatsappNumber || '';
             waInput.placeholder = 'e.g. +91 9876543210';
-            waInput.style.cssText = 'padding: 6px; border: 1px solid #ccc; border-radius: 4px; width: 100%;';
+            waInput.style.cssText = 'padding: 6px; border: 1px solid #ccc; border-radius: 4px; flex: 1;';
+            const waMsgBtn = document.createElement('button');
+            waMsgBtn.className = 'load-btn';
+            waMsgBtn.style.cssText = 'padding: 6px 12px; font-size: 0.85em; background: #25D366; white-space: nowrap;';
+            waMsgBtn.textContent = 'Message';
+            // Message the value currently in the field (lets host edit then message without saving).
+            waMsgBtn.onclick = () => messageOnWhatsApp(waInput.value);
+            waRow.append(waInput, waMsgBtn);
 
             const noteLabel = document.createElement('label');
             noteLabel.style.cssText = 'font-size: 0.8em; color: #666;';
@@ -1561,7 +1592,7 @@
                 status: statusSelect.value
             }, saveBtn);
 
-            controls.append(waLabel, waInput, noteLabel, noteInput, statusRow, saveBtn);
+            controls.append(waLabel, waRow, noteLabel, noteInput, statusRow, saveBtn);
             card.append(controls);
 
             return card;
