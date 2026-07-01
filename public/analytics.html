@@ -1253,8 +1253,13 @@
             const tbody = document.createElement('tbody');
             list.forEach(c => {
                 const tr = document.createElement('tr');
-                if (c.status === 'blacklisted') tr.style.background = 'rgba(220,53,69,0.08)';
-                else if (c.status === 'prospective') tr.style.background = 'rgba(40,167,69,0.08)';
+                if (c.status === 'blacklisted') {
+                    tr.style.background = 'rgba(220,53,69,0.18)';
+                    tr.style.borderLeft = '4px solid #dc3545';
+                } else if (c.status === 'prospective') {
+                    tr.style.background = 'rgba(40,167,69,0.18)';
+                    tr.style.borderLeft = '4px solid #28a745';
+                }
 
                 const st = STATUS_STYLES[c.status] || STATUS_STYLES.normal;
                 const cells = [
@@ -1309,8 +1314,13 @@
         function buildCustomerCard(c) {
             const card = document.createElement('div');
             card.className = 'customer-card';
-            if (c.status === 'blacklisted') card.style.borderLeft = '4px solid #dc3545';
-            else if (c.status === 'prospective') card.style.borderLeft = '4px solid #28a745';
+            if (c.status === 'blacklisted') {
+                card.style.borderLeft = '5px solid #dc3545';
+                card.style.background = 'rgba(220,53,69,0.10)';
+            } else if (c.status === 'prospective') {
+                card.style.borderLeft = '5px solid #28a745';
+                card.style.background = 'rgba(40,167,69,0.10)';
+            }
 
             // Header: name + status badge
             const header = document.createElement('div');
