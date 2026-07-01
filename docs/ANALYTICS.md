@@ -300,6 +300,22 @@ Customer-level data lives in a separate table (booking records are unchanged), k
 
 The table is created automatically on server startup (`initDB`).
 
+## Testing
+
+Automated tests guard the customer/booking relationships so future changes can't silently break them. GitHub Actions runs them on every push and PR to `main` (`.github/workflows/test.yml`, with a Postgres service container).
+
+- `npm run test:unit` — pure-logic tests, no database (`test_whatsapp.js` phone normalization, `test_earnings_proration.js` night-proration).
+- `npm run test:integration` — boots the Express app against a real Postgres and exercises the endpoints (`test/*.test.js`). Requires `DATABASE_URL` (and `HOST_KEY`).
+- `npm test` — runs both.
+
+Run integration tests locally against a throwaway DB:
+```bash
+createdb house_rules_test
+DATABASE_URL="postgresql://localhost/house_rules_test" HOST_KEY="test-host-key" npm test
+```
+
+**Relationships covered:** +91 phone normalization + invalid-number rejection, blacklist block (primary **and** additional guests, neutral 403 that never reveals the reason), prospective guests can still book, date-overlap 409, WhatsApp display precedence (booking number wins, profile fills the gap), profile upsert preserving the number when note/status is saved, customers linked by govt ID with the newest booking number winning, host-key protection, and amount → total-spent aggregation.
+
 ## Data Export for Marketing Tools
 
 To export customer data for use in email marketing platforms (Mailchimp, SendGrid, etc.):

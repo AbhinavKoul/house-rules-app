@@ -148,18 +148,23 @@ const initDB = async () => {
     await pool.query(createUniqueIndexQuery);
     await pool.query(createCustomerProfilesQuery);
     // Seed a test blacklisted ID (000000000) for verifying the block in prod.
-    await pool.query(
-      `INSERT INTO customer_profiles (govt_id_number, note, status)
-       VALUES ('000000000', 'Test blacklist ID', 'blacklisted')
-       ON CONFLICT (govt_id_number) DO NOTHING`
-    );
+    if (process.env.NODE_ENV !== 'test') {
+      await pool.query(
+        `INSERT INTO customer_profiles (govt_id_number, note, status)
+         VALUES ('000000000', 'Test blacklist ID', 'blacklisted')
+         ON CONFLICT (govt_id_number) DO NOTHING`
+      );
+    }
     console.log('Database table initialized successfully');
   } catch (err) {
     console.error('Error initializing database:', err);
   }
 };
 
-initDB();
+// Skip auto-init under test; the test harness controls DB setup/teardown.
+if (process.env.NODE_ENV !== 'test') {
+  initDB();
+}
 
 // Routes
 app.get('/', (req, res) => {
@@ -1164,6 +1169,11 @@ app.post('/api/update-check-out-date', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+// Only listen when run directly; tests import the app without binding a port.
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
+}
+
+module.exports = { app, pool, initDB };
