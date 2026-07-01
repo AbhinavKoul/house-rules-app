@@ -487,6 +487,7 @@
         <div id="dashboardContent" style="display: none;">
             <div class="nav-tabs">
                 <button class="nav-tab active" onclick="switchTab('occupancy')">Occupancy Trends</button>
+                <button class="nav-tab" onclick="switchTab('earnings')">Earnings</button>
                 <button class="nav-tab" onclick="switchTab('customers')">Recurring Customers</button>
             </div>
 
@@ -519,6 +520,57 @@
                     <h3>Bookings for Selected Period</h3>
                     <div id="periodInfo" class="period-info"></div>
                     <div id="periodBookingsTable"></div>
+                </div>
+            </div>
+
+            <!-- Earnings Dashboard -->
+            <div id="earningsDashboard" class="dashboard-section">
+                <div class="summary-cards">
+                    <div class="summary-card">
+                        <div class="summary-value" id="earningsTotal">₹0</div>
+                        <div class="summary-label">Total Earnings (all time)</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-value" id="earningsThisYear">₹0</div>
+                        <div class="summary-label">This Year</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-value" id="earningsAvg">₹0</div>
+                        <div class="summary-label">Avg. per Recorded Booking</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-value" id="earningsUnrecorded">0</div>
+                        <div class="summary-label">Bookings Without Amount</div>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <div class="chart-controls">
+                        <div class="control-group">
+                            <label>View:</label>
+                            <select id="earningsViewSelect" onchange="renderEarnings()">
+                                <option value="monthly">Monthly</option>
+                                <option value="quarterly">Quarterly</option>
+                                <option value="yearly">Yearly</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label>Periods:</label>
+                            <select id="earningsPeriodsSelect" onchange="renderEarnings()">
+                                <option value="6">Last 6</option>
+                                <option value="12" selected>Last 12</option>
+                                <option value="18">Last 18</option>
+                                <option value="24">Last 24</option>
+                            </select>
+                        </div>
+                    </div>
+                    <canvas id="earningsChart"></canvas>
+                </div>
+
+                <div id="earningsPeriodBookings" class="bookings-for-period" style="display: none;">
+                    <h3>Earnings for Selected Period</h3>
+                    <div id="earningsPeriodInfo" class="period-info"></div>
+                    <div id="earningsPeriodTable"></div>
                 </div>
             </div>
 
@@ -583,6 +635,7 @@
         let hostKey = '';
         let occupancyChart = null;
         let occupancyData = [];
+        let earningsChart = null;
         let allBookings = []; // Cache all bookings for quick lookup
 
         async function loadDashboard() {
@@ -883,6 +936,201 @@
             }
         }
 
+        // ---- Earnings (computed client-side from cached bookings) ----
+        const rupee = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        // Build period buckets [{label, start, end}] ending with the current period.
+        function buildEarningsPeriods(view, count) {
+            const now = new Date();
+            const periods = [];
+            for (let i = count - 1; i >= 0; i--) {
+                let start, end, label;
+                if (view === 'yearly') {
+                    const year = now.getFullYear() - i;
+                    start = new Date(year, 0, 1);
+                    end = new Date(year, 11, 31, 23, 59, 59, 999);
+                    label = String(year);
+                } else if (view === 'quarterly') {
+                    const targetQuarter = Math.floor(now.getMonth() / 3) - i;
+                    const year = now.getFullYear() + Math.floor(targetQuarter / 4);
+                    const q = ((targetQuarter % 4) + 4) % 4;
+                    start = new Date(year, q * 3, 1);
+                    end = new Date(year, q * 3 + 3, 0, 23, 59, 59, 999);
+                    label = `Q${q + 1} ${year}`;
+                } else { // monthly
+                    start = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                    end = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
+                    label = start.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                }
+                periods.push({ label, start, end });
+            }
+            return periods;
+        }
+
+        function renderEarnings() {
+            const view = document.getElementById('earningsViewSelect').value;
+            const count = parseInt(document.getElementById('earningsPeriodsSelect').value);
+
+            // Attribute each active booking's amount to the period containing its check-in date.
+            const active = allBookings.filter(b => !b.cancelled);
+            const totalAll = active.reduce((sum, b) => sum + parseFloat(b.amount_received || 0), 0);
+
+            const thisYear = new Date().getFullYear();
+            const totalThisYear = active
+                .filter(b => new Date(b.check_in_date).getFullYear() === thisYear)
+                .reduce((sum, b) => sum + parseFloat(b.amount_received || 0), 0);
+
+            const recorded = active.filter(b => parseFloat(b.amount_received || 0) > 0);
+            const avg = recorded.length ? totalAll / recorded.length : 0;
+
+            // Unrecorded = active bookings that have started (check-in in the past or today) but amount still 0.
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            const unrecorded = active.filter(b =>
+                parseFloat(b.amount_received || 0) === 0 && new Date(b.check_in_date) <= today
+            ).length;
+
+            document.getElementById('earningsTotal').textContent = rupee(totalAll);
+            document.getElementById('earningsThisYear').textContent = rupee(totalThisYear);
+            document.getElementById('earningsAvg').textContent = rupee(avg);
+            document.getElementById('earningsUnrecorded').textContent = unrecorded;
+
+            const periods = buildEarningsPeriods(view, count);
+            const data = periods.map(p => {
+                const bookings = active.filter(b => {
+                    const ci = new Date(b.check_in_date);
+                    return ci >= p.start && ci <= p.end;
+                });
+                return {
+                    label: p.label,
+                    periodStart: p.start.toISOString().split('T')[0],
+                    periodEnd: p.end.toISOString().split('T')[0],
+                    total: bookings.reduce((sum, b) => sum + parseFloat(b.amount_received || 0), 0),
+                    bookings: bookings.length
+                };
+            });
+
+            renderEarningsChart(data);
+        }
+
+        function renderEarningsChart(data) {
+            const ctx = document.getElementById('earningsChart').getContext('2d');
+            if (earningsChart) earningsChart.destroy();
+
+            earningsChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.map(d => d.label),
+                    datasets: [{
+                        label: 'Earnings (₹)',
+                        data: data.map(d => d.total),
+                        backgroundColor: 'rgba(40, 167, 69, 0.6)',
+                        borderColor: 'rgba(40, 167, 69, 1)',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    onClick: (event, elements) => {
+                        if (elements.length > 0) {
+                            showEarningsPeriod(data[elements[0].index]);
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { callback: (v) => '₹' + v.toLocaleString('en-IN') }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => {
+                                    const d = data[context.dataIndex];
+                                    return [`Earnings: ${rupee(d.total)}`, `Bookings: ${d.bookings}`];
+                                }
+                            }
+                        },
+                        title: { display: true, text: 'Click on a bar to view bookings for that period' }
+                    }
+                }
+            });
+        }
+
+        // Built with DOM APIs (not innerHTML): booking names are user-supplied.
+        function showEarningsPeriod(period) {
+            const container = document.getElementById('earningsPeriodBookings');
+            const infoDiv = document.getElementById('earningsPeriodInfo');
+            const tableDiv = document.getElementById('earningsPeriodTable');
+
+            infoDiv.textContent = '';
+            const strong = document.createElement('strong');
+            strong.textContent = period.label;
+            const hint = document.createElement('em');
+            hint.style.color = '#667eea';
+            hint.textContent = 'Click any row to view booking details';
+            infoDiv.append(strong, ` — Earnings: ${rupee(period.total)} across ${period.bookings} booking(s) — `, hint);
+
+            const periodStart = new Date(period.periodStart);
+            const periodEnd = new Date(period.periodEnd);
+            const bookings = allBookings.filter(b => {
+                if (b.cancelled) return false;
+                const ci = new Date(b.check_in_date);
+                return ci >= periodStart && ci <= periodEnd;
+            });
+
+            tableDiv.textContent = '';
+            if (bookings.length === 0) {
+                const empty = document.createElement('p');
+                empty.style.cssText = 'text-align: center; padding: 20px; color: #999;';
+                empty.textContent = 'No bookings found for this period';
+                tableDiv.append(empty);
+                container.style.display = 'block';
+                container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                return;
+            }
+
+            const table = document.createElement('table');
+            const thead = document.createElement('thead');
+            const headRow = document.createElement('tr');
+            ['ID', 'Name', 'Check-In', 'Check-Out', 'Amount'].forEach(h => {
+                const th = document.createElement('th');
+                th.textContent = h;
+                headRow.append(th);
+            });
+            thead.append(headRow);
+            table.append(thead);
+
+            const tbody = document.createElement('tbody');
+            bookings.forEach(b => {
+                const tr = document.createElement('tr');
+                tr.className = 'clickable-row';
+                tr.onclick = () => viewBookingDetails(b.id);
+                const amt = parseFloat(b.amount_received || 0);
+
+                [b.id, b.name, new Date(b.check_in_date).toLocaleDateString(), new Date(b.check_out_date).toLocaleDateString()].forEach(val => {
+                    const td = document.createElement('td');
+                    td.textContent = val;
+                    tr.append(td);
+                });
+
+                const amtTd = document.createElement('td');
+                if (amt > 0) {
+                    amtTd.textContent = rupee(amt);
+                } else {
+                    amtTd.textContent = 'Not recorded';
+                    amtTd.style.color = '#dc3545';
+                }
+                tr.append(amtTd);
+                tbody.append(tr);
+            });
+            table.append(tbody);
+            tableDiv.append(table);
+
+            container.style.display = 'block';
+            container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
         function switchTab(tab) {
             // Update tab buttons
             document.querySelectorAll('.nav-tab').forEach(btn => btn.classList.remove('active'));
@@ -895,6 +1143,9 @@
 
             if (tab === 'occupancy') {
                 document.getElementById('occupancyDashboard').classList.add('active');
+            } else if (tab === 'earnings') {
+                document.getElementById('earningsDashboard').classList.add('active');
+                renderEarnings();
             } else if (tab === 'customers') {
                 document.getElementById('customersDashboard').classList.add('active');
             }
