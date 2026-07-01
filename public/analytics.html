@@ -645,6 +645,10 @@
                             </select>
                         </div>
                         <div class="control-group">
+                            <label>Search:</label>
+                            <input type="text" id="customerSearchInput" placeholder="Name or govt ID" oninput="renderAllCustomers()" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                        <div class="control-group">
                             <label>Show:</label>
                             <select id="customerFilterSelect" onchange="renderAllCustomers()">
                                 <option value="all">All</option>
@@ -1286,8 +1290,13 @@
             const sortBy = document.getElementById('customerSortSelect').value;
             const filter = document.getElementById('customerFilterSelect').value;
 
+            const query = document.getElementById('customerSearchInput').value.trim().toLowerCase();
+
             let list = allCustomers.slice();
             if (filter !== 'all') list = list.filter(c => c.status === filter);
+            if (query) list = list.filter(c =>
+                (c.name || '').toLowerCase().includes(query) ||
+                (c.govtIdNumber || '').toLowerCase().includes(query));
 
             const sorters = {
                 spent: (a, b) => b.totalSpent - a.totalSpent,
