@@ -1271,6 +1271,9 @@
                     new Date(c.lastVisit).toLocaleDateString(),
                     c.whatsappNumber || '—'
                 ];
+                tr.className = 'clickable-row';
+                tr.onclick = () => openCustomerEdit(c.govtIdNumber);
+
                 cells.forEach((val, i) => {
                     const td = document.createElement('td');
                     td.textContent = val;
@@ -1283,7 +1286,7 @@
                 editBtn.className = 'load-btn';
                 editBtn.style.cssText = 'padding: 4px 12px; font-size: 0.85em;';
                 editBtn.textContent = 'Edit';
-                editBtn.onclick = () => openCustomerEdit(c.govtIdNumber);
+                editBtn.onclick = (e) => { e.stopPropagation(); openCustomerEdit(c.govtIdNumber); };
                 actionTd.append(editBtn);
                 tr.append(actionTd);
                 tbody.append(tr);
@@ -1292,16 +1295,76 @@
             return table;
         }
 
-        // Open the editable card for a single customer in the shared modal.
+        // Open the editable card + visit history for a single customer in the shared modal.
         function openCustomerEdit(govtIdNumber) {
             const c = allCustomers.find(x => x.govtIdNumber === govtIdNumber);
             if (!c) return;
             const modal = document.getElementById('customerModal');
-            document.getElementById('modalCustomerName').textContent = `${c.name || 'Customer'} — Edit Profile`;
-            document.getElementById('modalCustomerDetails').textContent = '';
+            document.getElementById('modalCustomerName').textContent = `${c.name || 'Customer'} — Profile & Visits`;
+
+            // Left: editable profile card
+            const details = document.getElementById('modalCustomerDetails');
+            details.textContent = '';
+            details.append(buildCustomerCard(c));
+
+            // Right: compact visit history from cached bookings (this customer's govt ID)
             const history = document.getElementById('modalBookingHistory');
             history.textContent = '';
-            history.append(buildCustomerCard(c));
+            const visits = allBookings
+                .filter(b => b.govt_id_number === govtIdNumber && !b.cancelled)
+                .sort((a, b) => new Date(b.check_in_date) - new Date(a.check_in_date));
+
+            const heading = document.createElement('h3');
+            heading.textContent = `Visits (${visits.length})`;
+            history.append(heading);
+
+            if (visits.length === 0) {
+                const p = document.createElement('p');
+                p.style.cssText = 'color: #999; padding: 10px;';
+                p.textContent = 'No visits found';
+                history.append(p);
+            } else {
+                const table = document.createElement('table');
+                const thead = document.createElement('thead');
+                const hr = document.createElement('tr');
+                ['Check-In', 'Check-Out', 'Nights', 'Guests', 'Amount'].forEach(h => {
+                    const th = document.createElement('th');
+                    th.textContent = h;
+                    hr.append(th);
+                });
+                thead.append(hr);
+                table.append(thead);
+
+                const tbody = document.createElement('tbody');
+                visits.forEach(b => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'clickable-row';
+                    tr.onclick = () => viewBookingDetails(b.id);
+                    const ci = new Date(b.check_in_date);
+                    const co = new Date(b.check_out_date);
+                    const nights = Math.ceil((co - ci) / (1000 * 60 * 60 * 24));
+                    const amt = parseFloat(b.amount_received || 0);
+                    const guests = b.number_of_guests + (b.number_of_children || 0);
+
+                    [ci.toLocaleDateString(), co.toLocaleDateString(), nights, guests].forEach(val => {
+                        const td = document.createElement('td');
+                        td.textContent = val;
+                        tr.append(td);
+                    });
+                    const amtTd = document.createElement('td');
+                    if (amt > 0) {
+                        amtTd.textContent = rupee(amt);
+                    } else {
+                        amtTd.textContent = 'Not recorded';
+                        amtTd.style.color = '#dc3545';
+                    }
+                    tr.append(amtTd);
+                    tbody.append(tr);
+                });
+                table.append(tbody);
+                history.append(table);
+            }
+
             modal.style.display = 'block';
         }
 
