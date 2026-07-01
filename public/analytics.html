@@ -890,6 +890,11 @@
                         nameDisplay += ` <span style="color: #ff9800; font-size: 0.8em;" title="Used ${customer.allNames.length} different names: ${customer.allNames.join(', ')}">(${customer.allNames.length} names)</span>`;
                     }
 
+                    // Avg. per day = total spent / total nights across all stays
+                    const custTotalDays = customer.bookings.reduce((sum, b) =>
+                        sum + Math.ceil((new Date(b.check_out) - new Date(b.check_in)) / (1000 * 60 * 60 * 24)), 0);
+                    const custAvgPerDay = custTotalDays > 0 ? customer.totalSpent / custTotalDays : 0;
+
                     card.innerHTML = `
                         <div class="customer-header">
                             <div>
@@ -921,6 +926,10 @@
                             <div class="stat-item">
                                 <div class="stat-label">Total Spent</div>
                                 <div class="stat-value">${rupee(customer.totalSpent)}</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-label">Avg. per Day</div>
+                                <div class="stat-value">${rupee(custAvgPerDay)}</div>
                             </div>
                         </div>
                         <div class="last-visit-alert ${alertClass}">
