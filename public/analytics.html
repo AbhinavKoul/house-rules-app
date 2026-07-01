@@ -465,6 +465,34 @@
             .summary-cards {
                 grid-template-columns: repeat(2, 1fr);
             }
+
+            .summary-card {
+                padding: 15px 10px;
+            }
+
+            /* Money values are long — shrink so they fit in a half-width card */
+            .summary-value {
+                font-size: 1.5em;
+            }
+
+            .chart-container,
+            .bookings-for-period {
+                padding: 12px;
+            }
+
+            /* Let wide tables scroll instead of crushing their columns */
+            .bookings-for-period,
+            #earningsPeriodTable {
+                overflow-x: auto;
+            }
+
+            .bookings-for-period table {
+                min-width: 480px;
+            }
+
+            th, td {
+                padding: 8px;
+            }
         }
     </style>
 </head>
@@ -991,6 +1019,37 @@
         // ---- Earnings (computed client-side from cached bookings) ----
         const rupee = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+        // Nights of a stay [check-in, check-out) that fall within [start, end]. Check-out day is not a night.
+        function nightsInPeriod(b, start, end) {
+            const ci = new Date(b.check_in_date); ci.setHours(0, 0, 0, 0);
+            const co = new Date(b.check_out_date); co.setHours(0, 0, 0, 0);
+            let n = 0;
+            for (let d = new Date(ci); d < co; d.setDate(d.getDate() + 1)) {
+                if (d >= start && d <= end) n++;
+            }
+            return n;
+        }
+
+        function isSameDayStayInPeriod(b, start, end) {
+            const ci = new Date(b.check_in_date); ci.setHours(0, 0, 0, 0);
+            const co = new Date(b.check_out_date); co.setHours(0, 0, 0, 0);
+            return ci.getTime() === co.getTime() && ci >= start && ci <= end;
+        }
+
+        const overlapsPeriod = (b, start, end) => nightsInPeriod(b, start, end) > 0 || isSameDayStayInPeriod(b, start, end);
+
+        // Amount split evenly across nights; returns the portion whose nights fall in [start, end].
+        // e.g. a stay 30 Jun–4 Jul (4 nights) attributes 1/4 to June, 3/4 to July.
+        function proratedAmount(b, start, end) {
+            const amount = parseFloat(b.amount_received || 0);
+            if (!amount) return 0;
+            const ci = new Date(b.check_in_date); ci.setHours(0, 0, 0, 0);
+            const co = new Date(b.check_out_date); co.setHours(0, 0, 0, 0);
+            const totalNights = Math.round((co - ci) / 86400000);
+            if (totalNights <= 0) return isSameDayStayInPeriod(b, start, end) ? amount : 0;
+            return amount * nightsInPeriod(b, start, end) / totalNights;
+        }
+
         // Build period buckets [{label, start, end}] ending with the current period.
         function buildEarningsPeriods(view, count) {
             const now = new Date();
@@ -1027,10 +1086,12 @@
             const active = allBookings.filter(b => !b.cancelled);
             const totalAll = active.reduce((sum, b) => sum + parseFloat(b.amount_received || 0), 0);
 
+            // Prorate by nights so a stay spanning the year boundary counts only its in-year nights.
             const thisYear = new Date().getFullYear();
+            const yearStart = new Date(thisYear, 0, 1);
+            const yearEnd = new Date(thisYear, 11, 31, 23, 59, 59, 999);
             const totalThisYear = active
-                .filter(b => new Date(b.check_in_date).getFullYear() === thisYear)
-                .reduce((sum, b) => sum + parseFloat(b.amount_received || 0), 0);
+                .reduce((sum, b) => sum + proratedAmount(b, yearStart, yearEnd), 0);
 
             const recorded = active.filter(b => parseFloat(b.amount_received || 0) > 0);
             const avg = recorded.length ? totalAll / recorded.length : 0;
@@ -1048,15 +1109,13 @@
 
             const periods = buildEarningsPeriods(view, count);
             const data = periods.map(p => {
-                const bookings = active.filter(b => {
-                    const ci = new Date(b.check_in_date);
-                    return ci >= p.start && ci <= p.end;
-                });
+                // A stay counts toward every period it has nights in; its amount is prorated per night.
+                const bookings = active.filter(b => overlapsPeriod(b, p.start, p.end));
                 return {
                     label: p.label,
                     periodStart: p.start.toISOString().split('T')[0],
                     periodEnd: p.end.toISOString().split('T')[0],
-                    total: bookings.reduce((sum, b) => sum + parseFloat(b.amount_received || 0), 0),
+                    total: bookings.reduce((sum, b) => sum + proratedAmount(b, p.start, p.end), 0),
                     bookings: bookings.length
                 };
             });
@@ -1124,12 +1183,8 @@
             infoDiv.append(strong, ` — Earnings: ${rupee(period.total)} across ${period.bookings} booking(s) — `, hint);
 
             const periodStart = new Date(period.periodStart);
-            const periodEnd = new Date(period.periodEnd);
-            const bookings = allBookings.filter(b => {
-                if (b.cancelled) return false;
-                const ci = new Date(b.check_in_date);
-                return ci >= periodStart && ci <= periodEnd;
-            });
+            const periodEnd = new Date(period.periodEnd); periodEnd.setHours(23, 59, 59, 999);
+            const bookings = allBookings.filter(b => !b.cancelled && overlapsPeriod(b, periodStart, periodEnd));
 
             tableDiv.textContent = '';
             if (bookings.length === 0) {
@@ -1145,7 +1200,7 @@
             const table = document.createElement('table');
             const thead = document.createElement('thead');
             const headRow = document.createElement('tr');
-            ['ID', 'Name', 'Check-In', 'Check-Out', 'Amount'].forEach(h => {
+            ['ID', 'Name', 'Check-In', 'Check-Out', 'Earnings (this period)'].forEach(h => {
                 const th = document.createElement('th');
                 th.textContent = h;
                 headRow.append(th);
@@ -1158,7 +1213,7 @@
                 const tr = document.createElement('tr');
                 tr.className = 'clickable-row';
                 tr.onclick = () => viewBookingDetails(b.id);
-                const amt = parseFloat(b.amount_received || 0);
+                const amt = proratedAmount(b, periodStart, periodEnd);
 
                 [b.id, b.name, new Date(b.check_in_date).toLocaleDateString(), new Date(b.check_out_date).toLocaleDateString()].forEach(val => {
                     const td = document.createElement('td');

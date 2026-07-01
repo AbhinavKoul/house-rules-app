@@ -114,7 +114,9 @@ Each recurring customer (2+ visits) shows:
 **Data source:** Each booking has an editable `amount_received` value (set by the host in the admin panel — see [Amount Tracking](#amount-tracking-admin) below). Earnings are computed entirely client-side from the loaded bookings — no dedicated endpoint.
 
 **Attribution rules:**
-- Each booking's amount is attributed to the period containing its **check-in date**.
+- Each booking's amount is **prorated by night** and attributed to the period(s) the nights fall in. The amount is split evenly across the stay's nights ([check-in, check-out), so the check-out day is not a night). Example: a stay from **30 Jun → 4 Jul** (4 nights) with ₹4,000 attributes ₹1,000 to June (1 night) and ₹3,000 to July (3 nights). This applies across month, quarter, and year boundaries (including "This Year").
+- A same-day stay (0 nights) is attributed in full to its single day's period.
+- A booking appears in every period it has nights in; the drill-down "Earnings (this period)" column shows only that period's prorated share.
 - **Cancelled bookings are excluded** from all earnings figures.
 
 **Summary Cards:**
