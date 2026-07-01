@@ -421,7 +421,8 @@
             width: 200px;
         }
 
-        .dob-container {
+        .dob-container,
+        .amount-container {
             display: flex;
             align-items: center;
             gap: 10px;
@@ -1116,6 +1117,14 @@
                         <div class="detail-label">Email:</div>
                         <div class="detail-value">${booking.email}</div>
                     </div>
+                    ${booking.whatsapp_number ? `
+                    <div class="detail-row">
+                        <div class="detail-label">WhatsApp:</div>
+                        <div class="detail-value">
+                            <a href="https://wa.me/${booking.whatsapp_number.replace(/[^\d]/g, '')}" target="_blank" rel="noopener">${booking.whatsapp_number}</a>
+                        </div>
+                    </div>
+                    ` : ''}
                     <div class="detail-row">
                         <div class="detail-label">Date of Birth:</div>
                         <div class="detail-value">
@@ -1220,6 +1229,15 @@
                                 getBookingStatus(booking) === 'completed' ? 'Completed' :
                                 'Active'
                             }
+                        </div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Amount Received:</div>
+                        <div class="detail-value">
+                            <div class="amount-container">
+                                <span id="amount-${booking.id}">₹${parseFloat(booking.amount_received || 0).toFixed(2)}</span>
+                                <button class="edit-btn" onclick="editAmount(${booking.id}, ${parseFloat(booking.amount_received || 0)})">Edit</button>
+                            </div>
                         </div>
                     </div>
                     <div class="detail-row">
@@ -1394,6 +1412,82 @@
                 <span id="${elementId}">${originalValue}</span>
                 <button class="edit-btn" onclick="editGovtId(${bookingId}, ${guestIndex}, '${originalValue}')">Edit</button>
             `;
+        }
+
+        // Edit amount received functionality (admin only, always editable)
+        // Uses DOM APIs (not innerHTML) — values are numeric so no XSS surface.
+        function editAmount(bookingId, currentValue) {
+            const container = document.getElementById(`amount-${bookingId}`).parentElement;
+            container.textContent = '';
+
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.id = `input-amount-${bookingId}`;
+            input.className = 'govt-id-input';
+            input.min = '0';
+            input.step = '0.01';
+            input.value = currentValue;
+
+            const saveBtn = document.createElement('button');
+            saveBtn.className = 'save-btn';
+            saveBtn.textContent = 'Save';
+            saveBtn.onclick = () => saveAmount(bookingId, currentValue);
+
+            const cancelBtn = document.createElement('button');
+            cancelBtn.className = 'cancel-edit-btn';
+            cancelBtn.textContent = 'Cancel';
+            cancelBtn.onclick = () => renderAmount(bookingId, currentValue);
+
+            container.append(input, saveBtn, cancelBtn);
+            input.focus();
+        }
+
+        async function saveAmount(bookingId, originalValue) {
+            const newValue = parseFloat(document.getElementById(`input-amount-${bookingId}`).value);
+
+            if (isNaN(newValue) || newValue < 0) {
+                showMessage('Please enter a valid non-negative amount', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/update-amount', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ bookingId, amountReceived: newValue, hostKey })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showMessage(result.message, 'success');
+                    renderAmount(bookingId, newValue);
+                    const booking = allBookings.find(b => b.id === bookingId);
+                    if (booking) booking.amount_received = newValue;
+                } else {
+                    showMessage(result.error || 'Failed to update amount', 'error');
+                }
+            } catch (error) {
+                console.error('Error updating amount:', error);
+                showMessage('Network error. Please try again.', 'error');
+            }
+        }
+
+        function renderAmount(bookingId, value) {
+            const input = document.getElementById(`input-amount-${bookingId}`);
+            const container = input ? input.parentElement : document.getElementById(`amount-${bookingId}`).parentElement;
+            container.textContent = '';
+
+            const span = document.createElement('span');
+            span.id = `amount-${bookingId}`;
+            span.textContent = `₹${parseFloat(value).toFixed(2)}`;
+
+            const editBtn = document.createElement('button');
+            editBtn.className = 'edit-btn';
+            editBtn.textContent = 'Edit';
+            editBtn.onclick = () => editAmount(bookingId, parseFloat(value));
+
+            container.append(span, editBtn);
         }
 
         // Edit date of birth functionality

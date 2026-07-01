@@ -30,6 +30,8 @@ const initDB = async () => {
       dob DATE NOT NULL,
       govt_id_type VARCHAR(50) NOT NULL,
       govt_id_number VARCHAR(100) NOT NULL,
+      whatsapp_number VARCHAR(20),
+      amount_received NUMERIC(10,2) DEFAULT 0,
       number_of_guests INTEGER DEFAULT 1,
       number_of_children INTEGER DEFAULT 0,
       relationship_type VARCHAR(50),
@@ -96,6 +98,16 @@ const initDB = async () => {
       EXCEPTION
         WHEN duplicate_column THEN NULL;
       END;
+      BEGIN
+        ALTER TABLE acknowledgments ADD COLUMN whatsapp_number VARCHAR(20);
+      EXCEPTION
+        WHEN duplicate_column THEN NULL;
+      END;
+      BEGIN
+        ALTER TABLE acknowledgments ADD COLUMN amount_received NUMERIC(10,2) DEFAULT 0;
+      EXCEPTION
+        WHEN duplicate_column THEN NULL;
+      END;
     END $$;
   `;
 
@@ -136,11 +148,17 @@ app.get('/', (req, res) => {
 
 // Submit acknowledgment
 app.post('/api/acknowledge', async (req, res) => {
-  const { name, email, dob, govtIdType, govtIdNumber, numberOfGuests, numberOfChildren, relationshipType, additionalGuests, checkInDate, checkOutDate, emergencyContactName, emergencyContactPhone, emergencyContactRelationship } = req.body;
+  const { name, email, dob, govtIdType, govtIdNumber, whatsappNumber, numberOfGuests, numberOfChildren, relationshipType, additionalGuests, checkInDate, checkOutDate, emergencyContactName, emergencyContactPhone, emergencyContactRelationship } = req.body;
 
   // Validation
-  if (!name || !email || !dob || !govtIdType || !govtIdNumber || !numberOfGuests || !checkInDate || !checkOutDate) {
+  if (!name || !email || !dob || !govtIdType || !govtIdNumber || !whatsappNumber || !numberOfGuests || !checkInDate || !checkOutDate) {
     return res.status(400).json({ error: 'All fields are required' });
+  }
+
+  // Validate WhatsApp phone format
+  const whatsappClean = whatsappNumber.replace(/[\s\-]/g, '');
+  if (!/^\+?\d{7,15}$/.test(whatsappClean)) {
+    return res.status(400).json({ error: 'Please enter a valid WhatsApp number (7-15 digits)' });
   }
 
   // Validate emergency contact fields
@@ -237,8 +255,8 @@ app.post('/api/acknowledge', async (req, res) => {
     }
 
     const query = `
-      INSERT INTO acknowledgments (name, email, dob, govt_id_type, govt_id_number, number_of_guests, number_of_children, relationship_type, additional_guests, check_in_date, check_out_date, ip_address, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+      INSERT INTO acknowledgments (name, email, dob, govt_id_type, govt_id_number, whatsapp_number, number_of_guests, number_of_children, relationship_type, additional_guests, check_in_date, check_out_date, ip_address, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
       RETURNING id, acknowledged_at, check_in_date, check_out_date
     `;
 
@@ -248,6 +266,7 @@ app.post('/api/acknowledge', async (req, res) => {
       dob,
       govtIdType,
       govtIdNumber,
+      whatsappNumber,
       numGuests,
       numChildren,
       totalPeople > 1 ? relationshipType : null,
@@ -285,7 +304,7 @@ app.get('/api/acknowledgments', async (req, res) => {
 
   try {
     const result = await pool.query(
-      'SELECT id, name, email, dob, govt_id_type, govt_id_number, number_of_guests, number_of_children, relationship_type, additional_guests, check_in_date, check_out_date, cancelled, acknowledged_at, ip_address, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship FROM acknowledgments ORDER BY check_in_date DESC'
+      'SELECT id, name, email, dob, govt_id_type, govt_id_number, whatsapp_number, amount_received, number_of_guests, number_of_children, relationship_type, additional_guests, check_in_date, check_out_date, cancelled, acknowledged_at, ip_address, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship FROM acknowledgments ORDER BY check_in_date DESC'
     );
     res.json(result.rows);
   } catch (err) {
@@ -341,6 +360,36 @@ app.post('/api/cancel-booking', async (req, res) => {
   }
 });
 
+
+// Update amount received (admin only)
+app.post('/api/update-amount', async (req, res) => {
+  const { bookingId, amountReceived, hostKey } = req.body;
+
+  if (!hostKey || hostKey !== process.env.HOST_KEY) {
+    return res.status(403).json({ error: 'Unauthorized: Invalid or missing host key' });
+  }
+
+  const amount = parseFloat(amountReceived);
+  if (!bookingId || isNaN(amount) || amount < 0) {
+    return res.status(400).json({ error: 'Booking ID and a valid non-negative amount are required' });
+  }
+
+  try {
+    const result = await pool.query(
+      'UPDATE acknowledgments SET amount_received = $1 WHERE id = $2 RETURNING id, amount_received',
+      [amount, bookingId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    res.json({ success: true, message: 'Amount updated successfully', data: result.rows[0] });
+  } catch (err) {
+    console.error('Database error:', err);
+    res.status(500).json({ error: 'Failed to update amount' });
+  }
+});
 
 // Update government ID number
 app.post('/api/update-govt-id', async (req, res) => {

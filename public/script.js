@@ -189,6 +189,7 @@ document.addEventListener('DOMContentLoaded', function() {
             dob: document.getElementById('dob').value,
             govtIdType: document.getElementById('govtIdType').value,
             govtIdNumber: document.getElementById('govtIdNumber').value.trim(),
+            whatsappNumber: document.getElementById('whatsappNumber').value.trim(),
             numberOfGuests: numberOfGuests,
             numberOfChildren: numberOfChildren,
             relationshipType: totalPeople > 1 ? document.getElementById('relationshipType').value : null,
@@ -261,6 +262,12 @@ document.addEventListener('DOMContentLoaded', function() {
         // Validate government ID
         if (!validateGovtId(formData.govtIdType, formData.govtIdNumber)) {
             showMessage('Please enter a valid government ID number.', 'error');
+            return;
+        }
+
+        // Validate WhatsApp number
+        if (!validatePhone(formData.whatsappNumber)) {
+            showMessage('Please enter a valid WhatsApp number (7-15 digits, may include + prefix).', 'error');
             return;
         }
 
