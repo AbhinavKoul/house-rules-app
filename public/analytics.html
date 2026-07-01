@@ -1788,6 +1788,15 @@
                         <div class="detail-value">${booking.email}</div>
                     </div>
                     <div class="detail-row">
+                        <div class="detail-label">WhatsApp/Phone:</div>
+                        <div class="detail-value">
+                            ${booking.whatsapp_number ?
+                                `<a href="https://wa.me/${booking.whatsapp_number.replace(/[^\d]/g, '')}" target="_blank" rel="noopener">${booking.whatsapp_number}</a>` :
+                                '<span style="color: #999;">Not provided</span>'
+                            }
+                        </div>
+                    </div>
+                    <div class="detail-row">
                         <div class="detail-label">Date of Birth:</div>
                         <div class="detail-value">${dob}</div>
                     </div>
