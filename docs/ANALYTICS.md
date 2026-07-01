@@ -137,7 +137,16 @@ Each recurring customer (2+ visits) shows:
 
 **Filtering:** All / Prospective / Blacklisted / Normal.
 
-**Views:** Table (compact, default) for scanning many customers at once, or Cards (detailed) for inline editing. In Table view, the per-row **Edit** button opens the full editable card in a modal.
+**Views:** Table (compact, default) for scanning many customers at once, or Cards (detailed) for inline editing.
+
+**Color coding:** Blacklisted customers are shown with a red background + left border; prospective customers with green — in both card and table views (plus a colored status badge/label).
+
+**Row click → profile & visits:** Clicking any customer row (or the per-row **Edit** button) opens a modal with:
+- The full editable profile card (WhatsApp / note / status / save) on the left
+- A compact **Visits (N)** table on the right: Check-In, Check-Out, Nights, Guests, Amount (₹ or red "Not recorded"), newest first
+- Clicking any visit row opens that booking's full details
+
+Visits are read from the cached bookings (`/api/acknowledgments`) filtered by government ID, cancelled excluded — no extra endpoint.
 
 **Editable per customer (saved to `customer_profiles`, keyed by govt ID):**
 - **WhatsApp/Phone:** One number per person. Defaults to their most recent booking's number; the host edit overrides it. Validated and normalized with the same +91 rule as the booking form (10-digit Indian numbers get `+91`; others must include a country code).
