@@ -1010,7 +1010,9 @@ app.get('/api/statistics/customers', async (req, res) => {
         govtIdType: c.govt_id_type,
         name: c.name,
         email: c.email,
-        whatsappNumber: c.profile_whatsapp || c.booking_whatsapp || '',
+        // Linked by govt ID; the most recent booking's number wins, falling back to the
+        // backtracked profile number for customers whose bookings never captured one.
+        whatsappNumber: c.booking_whatsapp || c.profile_whatsapp || '',
         bookingCount: parseInt(c.booking_count),
         firstVisit: c.first_visit,
         lastVisit: c.last_visit,
@@ -1056,11 +1058,13 @@ app.post('/api/update-customer-profile', async (req, res) => {
   }
 
   try {
+    // Phone numbers are no longer hand-edited (linked automatically by govt ID from bookings).
+    // Preserve any existing/backtracked whatsapp on update so note/status saves never wipe it.
     const result = await pool.query(
       `INSERT INTO customer_profiles (govt_id_number, whatsapp_number, note, status, updated_at)
        VALUES ($1, $2, $3, COALESCE($4, 'normal'), CURRENT_TIMESTAMP)
        ON CONFLICT (govt_id_number) DO UPDATE SET
-         whatsapp_number = EXCLUDED.whatsapp_number,
+         whatsapp_number = COALESCE(EXCLUDED.whatsapp_number, customer_profiles.whatsapp_number),
          note = EXCLUDED.note,
          status = COALESCE($4, customer_profiles.status),
          updated_at = CURRENT_TIMESTAMP

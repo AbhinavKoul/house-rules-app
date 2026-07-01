@@ -150,9 +150,11 @@ Each recurring customer (2+ visits) shows:
 
 Visits are read from the cached bookings (`/api/acknowledgments`) filtered by government ID, cancelled excluded — no extra endpoint.
 
+**Phone number (read-only, linked by govt ID):**
+- Each customer's WhatsApp/Phone is **not hand-edited**. It is linked automatically from their bookings by government ID — the **most recent booking's number wins**, falling back to the backtracked profile number for older customers whose bookings never captured one. Shown as a clickable `wa.me` link with a green **Message** button (customer table row and profile card).
+- **Numbers on record:** Every distinct number the customer has used across bookings is preserved per-booking. When a customer has used more than one number, the profile card lists them all as clickable `wa.me` links, so old numbers stay reachable.
+
 **Editable per customer (saved to `customer_profiles`, keyed by govt ID):**
-- **WhatsApp/Phone:** One number per person. Defaults to their most recent booking's number; the host edit overrides it. Validated and normalized with the same +91 rule as the booking form (10-digit Indian numbers get `+91`; others must include a country code). A green **Message** button opens a WhatsApp chat for that number (in the customer table row and profile card).
-- **Numbers on record:** Every distinct number the customer has used across bookings is preserved per-booking (a profile update never overwrites past bookings' numbers). When a customer has used more than one number, the profile card lists them all as clickable `wa.me` links, so old numbers remain reachable even after updating the single profile number to a new one.
 - **Note:** Free-text "what we think about this guest".
 - **Status (single value):** `normal` | `prospective` | `blacklisted`. Green border for prospective, red for blacklisted.
 
@@ -258,24 +260,23 @@ Returns **all** unique customers (grouped by government ID) joined with their ed
 }
 ```
 
-`whatsappNumber` falls back to the most recent booking's number when no profile override exists. `status` is one of `normal` | `prospective` | `blacklisted`. Sorted by total spent (descending) by default.
+`whatsappNumber` is linked by govt ID: the most recent booking's number wins, falling back to the stored profile number. `status` is one of `normal` | `prospective` | `blacklisted`. Sorted by total spent (descending) by default.
 
 ### POST /api/update-customer-profile
-Upserts a customer's profile (WhatsApp / note / status). **Host-key protected.**
+Upserts a customer's profile (note / status). **Host-key protected.**
 
 **Request body:**
 ```json
 {
   "govtIdNumber": "123456789012",
-  "whatsappNumber": "9876543210",
   "note": "Quiet, respectful",
   "status": "prospective",
   "hostKey": "..."
 }
 ```
 
-- `whatsappNumber` is normalized (+91 default). Passing an empty string clears it.
 - `status` must be `normal` | `prospective` | `blacklisted` if provided; omitting it leaves the existing status unchanged.
+- `whatsappNumber` is no longer set from the UI (phone numbers are linked automatically by govt ID). The endpoint still accepts it for backfilling, but on update an omitted number **preserves** the existing one rather than clearing it.
 
 ### POST /api/update-amount
 Updates the amount received for a booking. **Host-key protected.**

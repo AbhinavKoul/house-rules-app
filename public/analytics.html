@@ -1542,20 +1542,30 @@
             const waLabel = document.createElement('label');
             waLabel.style.cssText = 'font-size: 0.8em; color: #666;';
             waLabel.textContent = 'WhatsApp/Phone';
+            // Read-only: the number is linked automatically from the customer's bookings (govt ID),
+            // not hand-edited. Shown as a clickable link + Message button.
             const waRow = document.createElement('div');
-            waRow.style.cssText = 'display: flex; gap: 8px;';
-            const waInput = document.createElement('input');
-            waInput.type = 'tel';
-            waInput.value = c.whatsappNumber || '';
-            waInput.placeholder = 'e.g. +91 9876543210';
-            waInput.style.cssText = 'padding: 6px; border: 1px solid #ccc; border-radius: 4px; flex: 1;';
+            waRow.style.cssText = 'display: flex; gap: 8px; align-items: center;';
+            const waDisplay = document.createElement('span');
+            waDisplay.style.cssText = 'flex: 1;';
+            if (c.whatsappNumber) {
+                const link = document.createElement('a');
+                link.href = `https://wa.me/${c.whatsappNumber.replace(/[^\d]/g, '')}`;
+                link.target = '_blank';
+                link.rel = 'noopener';
+                link.textContent = c.whatsappNumber;
+                waDisplay.append(link);
+            } else {
+                waDisplay.textContent = 'Not on record';
+                waDisplay.style.color = '#999';
+            }
             const waMsgBtn = document.createElement('button');
             waMsgBtn.className = 'load-btn';
             waMsgBtn.style.cssText = 'padding: 6px 12px; font-size: 0.85em; background: #25D366; white-space: nowrap;';
             waMsgBtn.textContent = 'Message';
-            // Message the value currently in the field (lets host edit then message without saving).
-            waMsgBtn.onclick = () => messageOnWhatsApp(waInput.value);
-            waRow.append(waInput, waMsgBtn);
+            waMsgBtn.disabled = !c.whatsappNumber;
+            waMsgBtn.onclick = () => messageOnWhatsApp(c.whatsappNumber);
+            waRow.append(waDisplay, waMsgBtn);
 
             // All distinct numbers this customer has used across bookings (history is preserved
             // per-booking even when the single profile number above is updated to a new one).
@@ -1617,7 +1627,6 @@
             saveBtn.style.cssText = 'padding: 8px; margin-top: 4px;';
             saveBtn.textContent = 'Save';
             saveBtn.onclick = () => saveCustomerProfile(c.govtIdNumber, {
-                whatsappNumber: waInput.value.trim(),
                 note: noteInput.value.trim(),
                 status: statusSelect.value
             }, saveBtn);
