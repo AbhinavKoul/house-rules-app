@@ -47,4 +47,21 @@ assert.strictEqual(proratedAmount(sameDay, ...july), 0);
 // Total across all periods equals full amount (no earnings lost or double-counted).
 assert.strictEqual(proratedAmount(stay, ...june) + proratedAmount(stay, ...july), 4000);
 
+// Indian financial year (Apr 1 – Mar 31): FY starts in the Apr-containing calendar year.
+function fyStartYear(date) {
+  return date.getMonth() >= 3 ? date.getFullYear() : date.getFullYear() - 1;
+}
+assert.strictEqual(fyStartYear(new Date(2026, 3, 1)), 2026, 'Apr 2026 -> FY 2026');
+assert.strictEqual(fyStartYear(new Date(2026, 2, 31)), 2025, 'Mar 2026 -> FY 2025');
+assert.strictEqual(fyStartYear(new Date(2026, 0, 15)), 2025, 'Jan 2026 -> FY 2025');
+assert.strictEqual(fyStartYear(new Date(2025, 11, 31)), 2025, 'Dec 2025 -> FY 2025');
+
+// A stay spanning the FY boundary (Mar 31 -> Apr 1) splits across two FYs.
+const fy25 = [new Date(2025, 3, 1), new Date(2026, 2, 31, 23, 59, 59, 999)];
+const fy26 = [new Date(2026, 3, 1), new Date(2027, 2, 31, 23, 59, 59, 999)];
+const boundary = { check_in_date: '2026-03-30', check_out_date: '2026-04-02', amount_received: 3000 };
+// 3 nights: 30 Mar, 31 Mar (FY25), 1 Apr (FY26).
+assert.strictEqual(proratedAmount(boundary, ...fy25), 2000, 'FY25 gets 2 nights = ₹2000');
+assert.strictEqual(proratedAmount(boundary, ...fy26), 1000, 'FY26 gets 1 night = ₹1000');
+
 console.log('All earnings proration tests passed.');

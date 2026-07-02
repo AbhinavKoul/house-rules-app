@@ -588,7 +588,7 @@
                     </div>
                     <div class="summary-card">
                         <div class="summary-value" id="earningsThisYear">₹0</div>
-                        <div class="summary-label">This Year</div>
+                        <div class="summary-label">This FY (Apr–Mar)</div>
                     </div>
                     <div class="summary-card">
                         <div class="summary-value" id="earningsAvg">₹0</div>
@@ -605,9 +605,10 @@
                         <div class="control-group">
                             <label>View:</label>
                             <select id="earningsViewSelect" onchange="renderEarnings()">
+                                <option value="fy" selected>Financial Year (Apr–Mar)</option>
                                 <option value="monthly">Monthly</option>
                                 <option value="quarterly">Quarterly</option>
-                                <option value="yearly">Yearly</option>
+                                <option value="yearly">Yearly (Jan–Dec)</option>
                             </select>
                         </div>
                         <div class="control-group">
@@ -1082,12 +1083,22 @@
         }
 
         // Build period buckets [{label, start, end}] ending with the current period.
+        // Indian financial year (Apr 1 – Mar 31). Returns the calendar year the FY starts in.
+        function fyStartYear(date) {
+            return date.getMonth() >= 3 ? date.getFullYear() : date.getFullYear() - 1;
+        }
+
         function buildEarningsPeriods(view, count) {
             const now = new Date();
             const periods = [];
             for (let i = count - 1; i >= 0; i--) {
                 let start, end, label;
-                if (view === 'yearly') {
+                if (view === 'fy') {
+                    const sy = fyStartYear(now) - i;
+                    start = new Date(sy, 3, 1); // Apr 1
+                    end = new Date(sy + 1, 2, 31, 23, 59, 59, 999); // Mar 31
+                    label = `FY ${sy}-${String(sy + 1).slice(-2)}`;
+                } else if (view === 'yearly') {
                     const year = now.getFullYear() - i;
                     start = new Date(year, 0, 1);
                     end = new Date(year, 11, 31, 23, 59, 59, 999);
@@ -1117,12 +1128,12 @@
             const active = allBookings.filter(b => !b.cancelled);
             const totalAll = active.reduce((sum, b) => sum + parseFloat(b.amount_received || 0), 0);
 
-            // Prorate by nights so a stay spanning the year boundary counts only its in-year nights.
-            const thisYear = new Date().getFullYear();
-            const yearStart = new Date(thisYear, 0, 1);
-            const yearEnd = new Date(thisYear, 11, 31, 23, 59, 59, 999);
+            // Prorate by nights so a stay spanning the FY boundary counts only its in-FY nights.
+            const sy = fyStartYear(new Date());
+            const fyStart = new Date(sy, 3, 1); // Apr 1
+            const fyEnd = new Date(sy + 1, 2, 31, 23, 59, 59, 999); // Mar 31
             const totalThisYear = active
-                .reduce((sum, b) => sum + proratedAmount(b, yearStart, yearEnd), 0);
+                .reduce((sum, b) => sum + proratedAmount(b, fyStart, fyEnd), 0);
 
             const recorded = active.filter(b => parseFloat(b.amount_received || 0) > 0);
             const avg = recorded.length ? totalAll / recorded.length : 0;

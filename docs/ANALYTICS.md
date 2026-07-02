@@ -121,12 +121,12 @@ Each recurring customer (2+ visits) shows:
 
 **Summary Cards:**
 - **Total Earnings (all time):** Sum of all recorded amounts
-- **This Year:** Sum for bookings checking in during the current calendar year
+- **This FY (Apr–Mar):** Sum of prorated nights falling in the current Indian financial year (Apr 1 → Mar 31)
 - **Avg. per Recorded Booking:** Total ÷ number of bookings with a non-zero amount
 - **Bookings Without Amount:** Count of active bookings that have already started (check-in ≤ today) but still sit at ₹0 — a data-entry gap flag for tax completeness
 
 **Chart & Drill-down:**
-- Bar chart of earnings per period, with Monthly/Quarterly/Yearly + periods (6/12/18/24) toggles (matches Occupancy controls)
+- Bar chart of earnings per period. View toggle: **Financial Year (Apr–Mar)** — the default, one bar per Indian FY labelled `FY 2025-26` — plus Monthly, Quarterly, and Yearly (Jan–Dec), with periods (6/12/18/24) toggles (matches Occupancy controls)
 - Click any bar to see a per-booking amount breakdown for that period; unrecorded bookings show "Not recorded" in red
 
 ### 4. Customers Dashboard
